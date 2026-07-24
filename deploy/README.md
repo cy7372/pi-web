@@ -1,141 +1,115 @@
-# pi-web 公网部署(Caddy + Basic Auth)
+# pi-web 公网部署(Windows + Caddy + Servy,多实例隔离)
 
 ```
-互联网 ──HTTPS──▶ Caddy(:443) ──Basic Auth──▶ pi-web(127.0.0.1:30141)
-                   自动证书                      仅本机可达
+                  ┌─ alice.<域> ─▶ basicauth(alice) ─▶ 127.0.0.1:30141  (Servy pi-web-alice)
+互联网 ─▶ Caddy(:80/443) ─┤        自动 TLS              .pi = C:/pi-instances/alice/.pi
+         Servy: pi-caddy   └─ bob.<域>   ─▶ basicauth(bob)   ─▶ 127.0.0.1:30142  (Servy pi-web-bob)
+                                                              .pi = C:/pi-instances/bob/.pi
 ```
 
-pi-web 的设计前提是 **localhost 单用户**:30+ API 全部裸奔,`/api/agent/*` 可远程执行 bash,`/api/files/*` 可读文件,`/api/auth/api-key/*` 可读写你的 LLM key。直接暴露公网 = 公开 RCE。
+pi-web 设计前提是 **localhost 单用户**:30+ API 全裸奔,`/api/agent/*` 可远程执行 bash,`/api/files/*` 可读文件,`/api/auth/api-key/*` 可读写 LLM key。直接暴露 = 公开 RCE。
 
-本方案用 Caddy 做前端,在 TLS + 认证两层把关,pi-web 代码**零改动**(全部是新增文件,同步上游 agegr/pi-web 零冲突)。
+本方案在**这台 Windows 本机**上用 Caddy(TLS+Basic Auth)+ Servy 多实例,**代码零改动**(`deploy/` 纯新增,同步上游零冲突)。
+
+## 隔离原理
+
+pi 用 `os.homedir()` 定位 `~/.pi`(见 `pi-coding-agent/dist/config.js`)。Windows 上 `os.homedir()` 取 `USERPROFILE`。
+→ **每个 Servy 服务设独立 `HOME`+`USERPROFILE`,各实例的 `~/.pi`(session/密钥/配置/文件白名单)就完全隔离**,无需建多个 Windows 账户。
 
 ---
 
-## 前置条件
+## 前置(一次性)
 
-- 一台公网 Linux 服务器,已把域名 A 记录指向它
-- 已 [安装 Caddy](https://caddyserver.com/docs/install)(Debian/Ubuntu 一行 apt)
-- 服务器上已 `git clone` 本仓库并 `npm install && npm run build`
-- 80/443 端口对外开放,30141 **不要**对公网开放(见下方检查清单)
+1. **下载 Caddy** → `C:\caddy\caddy.exe`（<https://caddyserver.com/download>，Windows amd64）
+2. **构建 pi-web**:`npm install && npm run build`（所有实例共用同一份 `.next/`）
+3. **确认 node 稳定路径**:`C:\nvm4w\nodejs\node.exe`（nvm4w 符号链接，node 升级不会失效）
+4. PowerShell 用**管理员**开（Servy 注册服务 + 防火墙要管理员）
 
-## 三步部署
+## 部署你自己(复用现有 ~/.pi)
 
-```bash
-# 1. 为每个用户生成密码 hash(caddy 自带 bcrypt)
-caddy hash-password
-# 输出形如 $2a$14$abcdef...  → 填进 deploy/Caddyfile 的 basicauth 块
+你现有的全部 session/密钥在 `C:\Users\CyYu\.pi`。把你自己作为第一个实例，直接指向它:
 
-# 2. 改 Caddyfile 里的域名(两处 pi.yourdomain.com)和用户 hash
-
-# 3. 启动两个服务
-./deploy/start.sh &                        # pi-web,绑 127.0.0.1:30141
-caddy run --config deploy/Caddyfile &      # Caddy,占 80/443
+```powershell
+cd C:\Users\CyYu\D-Programs\pi-web\deploy
+.\install-instance.ps1 -Instance me -Port 30141 -PiHome C:\Users\CyYu
+servy-cli start --name=pi-web-me
+servy-cli query --name=pi-web-me      # 验证 env: HOME/USERPROFILE 应是 C:\Users\CyYu，反斜杠没被吞
 ```
 
-访问 `https://pi.yourdomain.com`,浏览器弹原生 Basic Auth 框,输入用户名密码即可。
+## 部署其他人(独立 ~/.pi)
 
-## 开机自启(systemd)
-
-```ini
-# /etc/systemd/system/pi-web.service
-[Unit]
-Description=pi-web (loopback only)
-After=network.target
-
-[Service]
-WorkingDirectory=/opt/pi-web
-ExecStart=/opt/pi-web/deploy/start.sh
-Restart=on-failure
-User=piweb                       # 用非 root 专用账户跑,别用你的开发账号
-
-[Install]
-WantedBy=multi-user.target
+```powershell
+.\install-instance.ps1 -Instance alice -Port 30142
+servy-cli start --name=pi-web-alice
+# alice 首次需在她的 ~/.pi (C:\pi-instances\alice\.pi) 配 LLM API key
+#   最快: 把你现有的 models.json / auth 复制过去(只复制配置,别复制 session 历史)
+#   Copy-Item C:\Users\CyYu\.pi\agent\models.json C:\pi-instances\alice\.pi\agent\
 ```
 
-```bash
-sudo systemctl daemon-reload && sudo systemctl enable --now pi-web
+## 注册 Caddy 前置
+
+```powershell
+.\install-caddy.ps1
+# 放行防火墙(管理员):
+New-NetFirewallRule -DisplayName "Caddy-HTTP"  -Direction Inbound -LocalPort 80  -Protocol TCP -Action Allow
+New-NetFirewallRule -DisplayName "Caddy-HTTPS" -Direction Inbound -LocalPort 443 -Protocol TCP -Action Allow
+servy-cli start --name=pi-caddy
 ```
 
-> Caddy 官方提供 systemd unit,装 apt 包时自动配好。
+## 配 Basic Auth
+
+```powershell
+caddy hash-password            # 交互输密码 → 输出 $2a$14$...
+# 编辑 deploy/Caddyfile: 改域名 + 把 REPLACE_WITH... 换成 hash
+servy-cli restart --name=pi-caddy
+```
 
 ## 加 / 删用户
 
-```bash
-# 加一个用户:生成 hash 后追加到 basicauth 块
-caddy hash-password
-# 然后 caddy reload --config deploy/Caddyfile  热加载,不断连
+```powershell
+# 加: 注册服务 + Caddyfile 复制一个 block(改域名/用户/hash/端口 4 处)
+.\install-instance.ps1 -Instance carol -Port 30143
+servy-cli start --name=pi-web-carol
+# (改 Caddyfile) → servy-cli restart --name=pi-caddy
+
+# 删:
+.\uninstall-instance.ps1 -Instance carol           # 留数据
+.\uninstall-instance.ps1 -Instance carol -RemoveData  # 连 ~/.pi 一起删
 ```
-
-## SSE 流式输出说明
-
-pi-web 的实时消息(`/api/agent/*/events`)走 SSE。Caddyfile 里两个关键配置:
-
-- `flush_interval -1` — 收到字节立即转发,不缓冲(否则输出卡住)
-- `transport read/write_timeout 24h` — SSE 长连接不被超时砍断
-
-浏览器原生 Basic Auth 通过后,同源 EventSource 请求会自动携带凭证,无需前端改动。
 
 ---
 
-## ⚠️ 「几个信任的人」共用一个实例的串扰警告
+## ⚠️ 隔离边界(信任但隔离隐私)
 
-pi-web 是**单用户设计**。多人共用同一实例时,即使不恶意,也会互相干扰:
+本方案隔离了 `~/.pi`(session 历史、API key、配置、文件白名单缓存)。但所有实例默认以 **LocalSystem** 同账户运行，文件系统权限相同——即 alice 的 agent 若被指示 `cwd` 到 bob 的项目目录，物理上能操作。
 
-| 问题 | 后果 |
-| ------ | ------ |
-| session 历史全局共享 | 所有人能看到彼此的全部对话(在 `~/.pi/agent/sessions/`) |
-| 同一 agent 运行池 | `globalThis.__piSessions` 是进程级单例,并发请求可能互相打断 |
-| 共享 `~/.pi` 配置 | 共用同一份 API key、models.json、settings.json |
-| 文件 allow-list 共享 | A 把某目录加进 cwd 白名单后,B 立刻也能读 |
-| 共享 cwd / bash | A 的 agent 执行 bash 会影响整台机器,B 正在跑的项目可能被改 |
+- 「信任不攻击 + 不想互看 session/密钥」→ **本方案足够**
+- 要连文件系统都强隔离 → 每个实例用独立 Windows 账户跑(servy `--runAs`，需另配 ACL)
 
-**如果用户之间只是"信任不攻击"但不想互相看到内容**,推荐每人独立实例:
+## SSE 流式
 
-```caddyfile
-alice.pi.yourdomain.com {
-    basicauth { alice $2a$14$... }
-    reverse_proxy 127.0.0.1:30141 { flush_interval -1 }
-}
-bob.pi.yourdomain.com {
-    basicauth { bob $2a$14$... }
-    reverse_proxy 127.0.0.1:30142 { flush_interval -1 }
-}
-```
+`/api/agent/*/events` 走 SSE。Caddyfile 两关键:`flush_interval -1`(不缓冲)+ `transport read/write_timeout 24h`(长连接不超时)。Basic Auth 通过后同源 EventSource 自动带凭证。
 
-每个实例用**不同的系统用户 + 不同 HOME** 启动,这样各自的 `~/.pi`、session 历史、文件权限完全隔离:
+## 临时调试(不走服务)
 
-```bash
-# alice 实例
-sudo -u piweb-alice HOME=/home/piweb-alice ./deploy/start.sh   # 端口 30141
-# bob 实例(复制一份 start.sh 改端口)
-sudo -u piweb-bob   HOME=/home/piweb-bob   ./deploy/start-bob.sh  # 30142
-```
+`deploy/start.sh`(git bash 里跑 `next start -H 127.0.0.1 -p 30141`),不注册服务、用当前账户的 `~/.pi`。仅供调试。
 
 ---
 
 ## 公网上线前检查清单
 
-- [ ] `next start` 命令含 `-H 127.0.0.1`(否则裸奔)
-- [ ] 防火墙只放行 22/80/443,**30141 不对外**
+- [ ] 每个 servy 服务 `servy-cli query` 确认 `USERPROFILE` 正确(反斜杠完整，非 root/非空)
+- [ ] `npm run build` 已跑(否则 next start 报错)
+- [ ] node.exe 用 `C:\nvm4w\nodejs\node.exe`(**不是**带版本号的 nvm 路径)
+- [ ] 防火墙只放行 80/443，30141/30142... **不对公网**(它们只绑 127.0.0.1，本就不可达，防火墙是双保险)
+- [ ] basicauth hash 已替换占位符
+- [ ] 每个实例 `~/.pi\agent\` 下 API key 文件仅 SYSTEM/对应账户可读
+- [ ] 域名 A 记录已指向本机公网 IP(Caddy 才能自动签 TLS)
 
-  ```bash
-  sudo ufw allow 22,80,443/tcp && sudo ufw enable
-  # 验证: 从外部 nmap 你的 IP,不应看到 30141
-  ```
+## 升级上游 agegr/pi-web
 
-- [ ] basicauth 用户 hash 已替换占位符,默认占位符绝不能上生产
-- [ ] 跑 pi-web 的是非 root 专用账户(`User=piweb`)
-- [ ] `~/.pi/agent/` 里的 API key 文件权限 `600`,属主是跑服务的账户
-- [ ] 定期看 Caddy 日志 `/var/log/caddy/pi-web.log` 有无异常 401 暴增(爆破尝试)
+`deploy/` 纯新增 → `git merge upstream/main` **零冲突**。SDK 升级(`npm update @earendil-works/pi-coding-agent`)与部署无关。node 升级无需改服务配置(用的是 nvm4w 稳定路径)。代码更新后重 `npm run build`，再逐个 `servy-cli restart --name=pi-web-*`。
 
-## 升级上游时的影响
+## 换 Linux 服务器?
 
-本目录是纯新增,不改动 agegr/pi-web 任何既有文件。
-`git merge upstream/main` 时 `deploy/` 不会产生任何冲突。
-唯一需要回归的是:上游若改了启动方式或默认端口,更新 `start.sh` 即可。
-
-## 可选增强
-
-- **OAuth 登录**(比 Basic Auth 体验好):用 `caddy-security` 插件或前置 `oauth2-proxy` 对接 GitHub/Google
-- **IP 白名单**:在 basicauth 前加 `@blocked not remote_ip 1.2.3.0/24` + `respond @blocked 403`
-- **限流防爆破**:`rate_limit` 插件限制 401 频率
+Windows 脚本失效，改用 `deploy/linux/` 下的 `pi-web@.service`(systemd 模板)+ `start-instance.sh`，原理相同(不同 User+HOME)。

@@ -1,0 +1,51 @@
+# systemd 模板服务 —— 每个用户一个 pi-web 实例
+#
+# 用法(%i = 实例名):
+#   systemctl enable --now pi-web@alice
+#   systemctl enable --now pi-web@bob
+#
+# 每加一个用户,先做这 3 步(只需一次):
+#   1. 建专用账户 + HOME:
+#        sudo useradd -m -d /home/piweb-alice -s /usr/sbin/nologin piweb-alice
+#   2. 指定该实例的 loopback 端口:
+#        sudo mkdir -p /etc/pi-web/instances
+#        echo "PORT=30141" | sudo tee /etc/pi-web/instances/alice.conf
+#   3. 让该账户能读 pi-web 代码(repo 目录),但 HOME 归它自己:
+#        sudo chown -R piweb-alice:piweb-alice /home/piweb-alice
+#        sudo setfacl -R -m u:piweb-alice:rX /opt/pi-web   # 只读访问 repo
+#   然后: systemctl enable --now pi-web@alice
+#
+# 隔离原理: 不同 User + 不同 HOME → 不同 ~/.pi → session/密钥/配置/文件白名单全隔离,
+#           再靠系统文件权限(每个 HOME 默认 700)互不可见。
+
+[Unit]
+Description=pi-web instance %i (loopback only)
+After=network.target
+
+[Service]
+Type=exec
+
+# ── 隔离的根本: 专用账户 + 专用 HOME ──
+User=piweb-%i
+Group=piweb-%i
+WorkingDirectory=/opt/pi-web
+Environment=HOME=/home/piweb-%i
+
+# 每实例端口配置: /etc/pi-web/instances/<实例>.conf  里写  PORT=30141
+EnvironmentFile=-/etc/pi-web/instances/%i.conf
+
+ExecStart=/opt/pi-web/deploy/start-instance.sh %i ${PORT}
+
+Restart=on-failure
+RestartSec=3
+
+# ── 可选加固(确认服务能正常跑起来后再逐项打开;起不来就先注释掉排查)──
+# NoNewPrivileges=true
+# ProtectSystem=strict
+# ReadWritePaths=/home/piweb-%i
+# PrivateTmp=true
+# ProtectKernelTunables=true
+# ProtectKernelModules=true
+
+[Install]
+WantedBy=multi-user.target
