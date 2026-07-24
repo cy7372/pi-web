@@ -1,0 +1,50 @@
+# pi-web 公网部署 Caddyfile
+# 架构: 互联网 → Caddy(443, 自动HTTPS, Basic Auth) → pi-web(127.0.0.1:30141)
+# 文档: https://caddyserver.com/docs/
+#
+# 用法:
+#   1. 把下面两处 pi.yourdomain.com 换成你的域名
+#   2. 用 `caddy hash-password` 为每个用户生成 bcrypt hash,填到 basicauth 块
+#   3. caddy start           # 前台/后台启动
+#      或: caddy run --config deploy/Caddyfile
+#   4. Caddy 会自动向 Let's Encrypt 申请证书,前提是域名 A 记录已指向本机
+
+pi.yourdomain.com {
+	encode zstd gzip
+
+	log {
+		output file /var/log/caddy/pi-web.log {
+			roll_size 10mb
+			roll_keep 5
+		}
+		format console
+	}
+
+	# ---------- 认证:每人一行 ----------
+	# 浏览器原生 Basic Auth 弹窗通过后,同源的 EventSource(SSE)请求会自动带凭证,
+	# 因此 pi-web 的流式接口无需额外处理。
+	# 生成 hash:  caddy hash-password  (交互输入密码,输出 $2a$14$... 填到下方)
+	basicauth {
+		alice $2a$14$REPLACE_WITH_BCRYPT_HASH_FOR_ALICE
+		bob   $2a$14$REPLACE_WITH_BCRYPT_HASH_FOR_BOB
+	}
+
+	# ---------- 反代到本机 pi-web ----------
+	# pi-web 必须以 `next start -H 127.0.0.1 -p 30141` 启动(见 start.sh)
+	reverse_proxy 127.0.0.1:30141 {
+		# SSE 关键:收到响应字节立即转发,不要缓冲
+		# pi-web 大量依赖 SSE (/api/agent/[id]/events, /api/agent/running/events)
+		flush_interval -1
+
+		# SSE 是长连接(可能保持数小时),给足读写超时避免被 Caddy 砍断
+		transport http {
+			read_timeout 24h
+			write_timeout 24h
+		}
+
+		# 透传真实客户端信息(可选,便于 pi-web 侧排查)
+		header_up X-Real-IP {remote_host}
+		header_up X-Forwarded-For {remote_host}
+		header_up X-Forwarded-Proto {scheme}
+	}
+}
