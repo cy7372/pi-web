@@ -1,23 +1,30 @@
-# pi-web 多实例公网部署(Windows + Caddy + Servy)
+# pi-web 公网部署(Windows + Caddy + Servy,单实例多用户)
 #
-# 每个 = 一个 Servy 服务 + 独立 ~/.pi:
-#   alice.<域> ─HTTPS─▶ basicauth(alice) ─▶ 127.0.0.1:30141  (Servy pi-web-alice, .pi=C:/pi-instances/alice/.pi)
-#   bob.<域>   ─HTTPS─▶ basicauth(bob)   ─▶ 127.0.0.1:30142  (Servy pi-web-bob,   .pi=C:/pi-instances/bob/.pi)
+# 架构:
+#   alice.<域> ┐
+#   bob.<域>   ─┼─HTTPS─▶ Caddy basicauth ─▶ 127.0.0.1:30141 (Servy pi-web)
+#   carol.<域> ┘                                  .pi = C:/pi-web-data/.pi (全员共享)
 #
-# 隔离: 每个 Servy 服务设 HOME+USERPROFILE 指向独立目录 → pi 的 os.homedir() 返回它 → ~/.pi 全隔离。
-# 配套: install-instance.ps1 / uninstall-instance.ps1 / install-caddy.ps1
-# 改完: servy-cli restart --name=pi-caddy   (热生效)
+# 所有人共享同一个 ~/.pi:session 历史/LLM key/配置/文件白名单互通。
+# 这是"几个信任的人"为省运维成本做的取舍。
+# 改完: servy-cli restart --name=pi-caddy
 
-# ── 实例 1: alice ──
+# ── 多用户共享一个后端 ──
+# 每个人一个 basicauth 用户名,反代到同一个 pi-web 实例
 alice.pi.yourdomain.com {
 	encode zstd gzip
 	log {
-		output file C:/pi-instances/logs/caddy.log { roll_size 10mb; roll_keep 5 }
+		output file C:/pi-web-data/logs/caddy.log { roll_size 10mb; roll_keep 5 }
 		format console
 	}
+
+	# basicauth 放所有用户名。浏览器会弹原生框,各自输各自的账号密码
 	basicauth {
 		alice $2a$14$REPLACE_WITH_BCRYPT_HASH_FOR_ALICE
+		bob   $2a$14$REPLACE_WITH_BCRYPT_HASH_FOR_BOB
+		carol $2a$14$REPLACE_WITH_BCRYPT_HASH_FOR_CAROL
 	}
+
 	reverse_proxy 127.0.0.1:30141 {
 		flush_interval -1
 		transport http { read_timeout 24h; write_timeout 24h }
@@ -27,26 +34,5 @@ alice.pi.yourdomain.com {
 	}
 }
 
-# ── 实例 2: bob ──
-bob.pi.yourdomain.com {
-	encode zstd gzip
-	log {
-		output file C:/pi-instances/logs/caddy.log { roll_size 10mb; roll_keep 5 }
-		format console
-	}
-	basicauth {
-		bob $2a$14$REPLACE_WITH_BCRYPT_HASH_FOR_BOB
-	}
-	reverse_proxy 127.0.0.1:30142 {
-		flush_interval -1
-		transport http { read_timeout 24h; write_timeout 24h }
-		header_up X-Real-IP {remote_host}
-		header_up X-Forwarded-For {remote_host}
-		header_up X-Forwarded-Proto {scheme}
-	}
-}
-
-# 加第 3 个人? 复制一个 block 改 4 处:
-#   1. 域名 carol.<域>   2. basicauth 用户名+hash   3. 端口 30143
-#   4. .\install-instance.ps1 -Instance carol -Port 30143
-#   然后 servy-cli restart --name=pi-caddy
+# 加 / 删用户:只在 basicauth 块里加/删一行
+#   caddy hash-password  生成 hash → 加一行 → servy-cli restart --name=pi-caddy
