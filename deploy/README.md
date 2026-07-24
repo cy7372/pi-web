@@ -1,136 +1,165 @@
-# pi-web 公网部署(Windows + Caddy + Servy,单实例多用户)
+# pi-web 部署:nginx 子路径 + TOTP 双因素认证
+
+> **废弃文件**:`Caddyfile`、`install-caddy.ps1`、`start.sh`、`linux/` 是早期 Caddy 方案的残留,保留供参考,**非当前方案,不要用**。
+
+## 架构
 
 ```
-alice.<域> ┐
-bob.<域>   ─┼─HTTPS─▶ Caddy(:80/443) basicauth ─▶ 127.0.0.1:30141 (Servy pi-web-shared)
-carol.<域> ┘   自动 TLS   多用户名各输各的密码          .pi = C:/pi-web-data/.pi (共享)
+                    公网 HTTPS :8443
+                           │
+                    ┌──────▼──────────┐
+                    │  nginx :8443     │
+                    │  pub.cyyu.me     │
+                    │                  │
+                    │  /pi/ ───────────┼──▶ auth_request /_auth_pi
+                    │    │             │         │
+                    │    │             │    ┌────▼────────────┐
+                    │    │             │    │ auth_server.py   │
+                    │    │             │    │ :21081            │
+                    │    │             │    │ realm=pi          │
+                    │    │             │    │ cookie __Host-pi  │
+                    │    │             │    └──────────────────┘
+                    │    ▼             │
+                    │  proxy_pass ─────┼──▶ pi-web Next.js :30141
+                    │  (保留 /pi 前缀)  │    basePath=/pi
+                    └─────────────────┘
 ```
 
-pi-web 设计前提是 **localhost 单用户**:30+ API 全裸奔,`/api/agent/*` 可远程执行 bash,`/api/files/*` 可读文件,`/api/auth/api-key/*` 可读写 LLM key。直接暴露 = 公开 RCE。
+- **认证层次**:TOTP(nginx `auth_request` → auth_server) → 后端 Basic Auth(nginx 注入 `pi-basic.key`)
+- **SSO**:`__Host-totp_sso` cookie(14 天,跨 realm 共享) → `/pi/_sso` 内部桥 → 自动签发 `__Host-pi_token`
+- **basePath**:pi-web 通过 `PI_WEB_BASE_PATH=/pi` 配合 monkey-patch 在 `/pi` 子路径下运行;nginx `proxy_pass` **不带尾斜杠**,保留 `/pi/` 前缀
 
-本方案在**这台 Windows 本机**上用 Caddy(TLS+Basic Auth)+ Servy 服务,**代码零改动**(`deploy/` 纯新增,同步上游零冲突)。
+## 改动文件清单
 
-## 单实例的取舍
+### pi-web 项目(`D:\Programs\pi-web`)
 
-几个人共享同一个 `~/.pi`:
-
-- ✓ 升级 node / 代码只 restart 1 次
-- ✓ LLM key 配一次大家都能用
-- ✓ 日志只有一份
-- ✗ session 历史互相可见;共用文件白名单;同一运行池高并发可能互相打断
-
-适用:**真信任、不在乎互相看 session/密钥**。要每人独立 `~/.pi` 见底部「多实例隔离」。
-
----
-
-## 前置(一次性)
-
-1. **下载 Caddy** → `C:\caddy\caddy.exe`(<https://caddyserver.com/download>,Windows amd64)
-2. **构建 pi-web**(项目用 bun):`bun install && bun run build`
-3. **确认路径**:`C:\nvm4w\nodejs\node.exe`(运行)+ `C:\nvm4w\nodejs\bun.exe`(构建),都在 nvm4w 符号链接下,node 升级不失效
-4. PowerShell 用**管理员**开(Servy + 防火墙要管理员)
-
-## ⚠️ 代理配置(关键,先读这节)
-
-`instrumentation.ts` 会给全局 fetch 装 undici 的 `EnvHttpProxyAgent`,读 `HTTP(S)_PROXY` 环境变量。
-
-- **必须设 `NO_PROXY=localhost,127.0.0.1`**:否则所有本地 `/api/*` 请求也被塞进代理 → 30s 超时挂死(现象:首页秒回 200,API 全挂)。`install-instance.ps1` **已自动设好**。
-- **LLM 出站代理**按你的服务器位置决定:
-
-| 场景 | -HttpProxy 参数 | 效果 |
+| 文件 | 作用 | 类型 |
 | --- | --- | --- |
-| 国内服务器,LLM 需代理访问 | `-HttpProxy http://127.0.0.1:19718` | LLM 走代理,本地 API 绕过 |
-| 海外服务器,直连 LLM | 不传 | 无代理变量,直连 |
+| `next.config.ts` | 读 `PI_WEB_BASE_PATH` env 设 `basePath` + 注入 `NEXT_PUBLIC_BASE_PATH` | 修改 |
+| `lib/base-path.ts` | 运行时 patch:拦截 fetch/EventSource,字符串 `/api/` → `/pi/api/` | 新增 |
+| `lib/base-path.test.ts` | patch 单元测试(10/10) | 新增 |
+| `components/BasePathPatch.tsx` | 客户端 `'use client'` 组件:挂载时调用 `patchBasePath()` | 新增 |
+| `app/layout.tsx` | `<head>` 注入 `__basePath` JS var + `<BasePathPatch />` | 修改 |
+| `deploy/LOCALHOST-TEST.md` | 本地 dev 模式验证脚本 | 新增 |
+| `deploy/README.md` | 本文档 | 重写 |
 
-> 本机当前环境有 `HTTP_PROXY=http://127.0.0.1:19718`(User 级)。但 servy 服务以 LocalSystem 跑,**不继承 User 级变量**,所以国内场景必须显式 `-HttpProxy` 传进去,否则 LLM 无法出站。
+> 未设 `PI_WEB_BASE_PATH` 时所有 patch 静默跳过,行为与上游完全相同(已 tsc + 单元测试验证)。
 
-## 部署(3 步)
+### nginx 侧(`C:\Users\CyYu\Run\nginx`)
 
-```powershell
-cd C:\Users\CyYu\D-Programs\pi-web\deploy
+| 文件 | 作用 | 类型 |
+| --- | --- | --- |
+| `conf/conf.d/pub.cyyu.me.conf` | + `/pi/` 全套 location 块(+`/_auth_pi`+`/pi/api/auth/`+`/pi/login.html`+`/pi/_sso`+`@pi_handle_unauth`) | 修改 |
+| `html/pi/login.html` | pi TOTP 登录页(照搬 opencode 模板,改 5 处:标题→Pi Web,POST `/pi/api/auth/login?realm=pi`,return→`/pi/`) | 新增 |
+| `auth/auth_server.py` | REALMS 字典 +`"pi"` realm,共享 `conf/totp.secret` | 修改 |
+| `conf/pi-basic.key` | 后端 Basic Auth 凭证:`proxy_set_header Authorization "Basic ..."`(nginx include) | 新增 |
 
-# 1. 注册 pi-web 服务(国内服务器加 -HttpProxy,海外不加)
-.\install-instance.ps1 -Instance shared -Port 30141 -PiHome C:\pi-web-data -HttpProxy http://127.0.0.1:19718
-servy-cli start --name=pi-web-shared
-servy-cli query --name=pi-web-shared   # 验证 env: NO_PROXY 在,HOME/USERPROFILE 正确
+### 不改的文件
 
-# 2. 注册 Caddy + 放行防火墙
-.\install-caddy.ps1
-New-NetFirewallRule -DisplayName "Caddy-HTTP"  -Direction Inbound -LocalPort 80  -Protocol TCP -Action Allow
-New-NetFirewallRule -DisplayName "Caddy-HTTPS" -Direction Inbound -LocalPort 443 -Protocol TCP -Action Allow
-servy-cli start --name=pi-caddy
+- `~/.pi/agent/`(单实例共享,不改)
+- pi-web 其余 58 个源文件(basePath 通过 4 个 patch 文件完成,不加散弹式修改)
+- nginx 其他 site block(menu/opencode/drop 不受影响)
 
-# 3. 配 Basic Auth 用户
-caddy hash-password            # 交互输密码 → $2a$14$...
-# 编辑 deploy/Caddyfile: 改域名 + 替换 REPLACE_WITH... hash
-servy-cli restart --name=pi-caddy
+## 前置条件
+
+- [x] pi-web 项目 `bun install` 已有
+- [x] `tsc --noEmit` 通过
+- [x] 客户端 patch 单元测试 10/10
+- [x] nginx 已有 `connection_upgrade` 映射(`map $http_upgrade $connection_upgrade {...}`)
+- [x] `blocked_ips.conf` + `api_limit` zone 已有
+- [x] `auth_server.py` 运行在 `:21081`(Servy 服务 `pi-auth-server`)
+
+## 激活步骤(按顺序)
+
+> ⚠️ **第 2 步 auth_server 重启会踢掉所有在线用户**(令牌在内存中)。选低峰期,或先通知用户。
+
+### 1. 确保 pi-web 在运行
+
+```bash
+# dev 模式(调试阶段)
+cd D:\Programs\pi-web
+MSYS_NO_PATHCONV=1 NO_PROXY=localhost,127.0.0.1 PI_WEB_BASE_PATH=/pi bun run dev
+
+# 生产模式(上线后)
+# bun run build  # 从真实路径 D:\Programs\pi-web(符号链接 C:\Users\CyYu\D-Programs\pi-web 有 EPERM)
+# servy-cli start --name=pi-web-shared
 ```
 
-访问 `https://<你的域名>`,浏览器弹 Basic Auth。第一次进 pi-web 后,在 `C:\pi-web-data\.pi\agent\` 配一份 LLM API key(models.json + auth),全员共享。
+### 2. 重启 auth_server(激活 pi realm)
 
-## 加 / 删用户(日常)
-
-```powershell
-caddy hash-password                                  # 生成 hash
-# Caddyfile 的 basicauth 块加一行: <名> $2a$14$...
-servy-cli restart --name=pi-caddy                    # 热生效,不断连
+```bash
+servy-cli restart --name=pi-auth-server
+servy-cli query --name=pi-auth-server   # 确认 Running
 ```
 
-## SSE 流式
+### 3. 重载 nginx(激活 /pi/ location)
 
-`/api/agent/*/events` 走 SSE。Caddyfile 两关键:`flush_interval -1`(不缓冲)+ `transport read/write_timeout 24h`(长连接不超时)。Basic Auth 通过后同源 EventSource 自动带凭证。
-
----
-
-## 升级 node(运维重点)
-
-servy 服务写死 `C:\nvm4w\nodejs\node.exe` 这个**符号链接**,`nvm use` 只改指向,路径永在 → **服务无需重新注册**。但运行中的进程不会自动换 node,需 restart。
-
-```powershell
-servy-cli query --name=pi-web-shared      # 1. 记基线
-nvm install 24                             # 2. 装新版本
-nvm use 24                                 # 3. 切过去(符号链接已变)
-
-cd C:\Users\CyYu\D-Programs\pi-web
-bun install                                # 4. 依赖若变了
-bun run build                              # 5. 关键!新 node 重新构建。报错就 nvm use 22.20.0 回退
-
-servy-cli restart --name=pi-web-shared     # 6. 重启(只此一次)
-servy-cli query --name=pi-web-shared       # 7. 确认 Running + 日志无报错
+```bash
+cd C:\Users\CyYu\Run\nginx
+.\nginx.exe -s reload
 ```
 
-> bun.exe 也在 `C:\nvm4w\nodejs\` 下,跟随符号链接。但 `nvm use` 切到的 node 目录里若没 bun.exe,bun 会失效——切版本后先 `bun --version` 确认。建议把 `22.20.0` 当锚定版本永久保留,出问题 `nvm use 22.20.0` 一键回退。
+> nginx `reload` 是热重载,不中断现有连接。若 `reload` 报错,先 `.\nginx.exe -t` 查语法。
 
-## 升级 pi-web 代码
+### 4. 验证
 
-```powershell
-cd C:\Users\CyYu\D-Programs\pi-web
-git pull                                   # 或 git merge upstream/main
-bun install                                # 依赖若变了
-bun run build
-servy-cli restart --name=pi-web-shared     # 只 restart 1 次
+```bash
+# 4a) nginx 登录页直接可达
+curl -k https://pub.cyyu.me:8443/pi/login.html
+# 应返回 login.html 内容
+
+# 4b) 未认证访问被拒
+curl -k -v https://pub.cyyu.me:8443/pi/api/sessions 2>&1 | grep "< HTTP"
+# 应 401
+
+# 4c) 完整流程(浏览器)
+# 打开 https://pub.cyyu.me:8443/pi/login.html
+# → 输 TOTP 码 → redirect 到 /pi/ → pi-web 正常加载
+# → Network 面板确认 API 请求带 /pi/api/... 前缀
 ```
 
----
+## 回退
 
-## 公网上线前检查清单
+```bash
+# 1. 注销 /pi/ location:注释掉 pub.cyyu.me.conf 中 pi 相关块,nginx -s reload
+# 2. 撤销 pi realm:auth_server.py 删 REALMS["pi"],restart auth_server
+# 3. pi-web 切回根路径:unset PI_WEB_BASE_PATH,restart pi-web
+```
 
-- [ ] `servy-cli query --name=pi-web-shared` 确认 env: `NO_PROXY=localhost,127.0.0.1` 在、`USERPROFILE=C:\pi-web-data` 反斜杠完整
-- [ ] **API 不超时**:浏览器打开 `https://<域>/api/sessions` 应秒回(若 30s 挂死 = NO_PROXY 没生效)
-- [ ] `bun run build` 已跑(否则 next start 报错)
-- [ ] node.exe 是 `C:\nvm4w\nodejs\node.exe`(**非**带版本号的 nvm 路径)
-- [ ] 防火墙只放行 80/443,30141 **不对公网**(它只绑 127.0.0.1,本就不可达)
-- [ ] basicauth hash 已替换占位符
-- [ ] `C:\pi-web-data\.pi\agent\` 下 API key 文件权限收紧
-- [ ] 域名 A 记录指向本机公网 IP(Caddy 才能自动签 TLS)
-- [ ] 国内服务器:`-HttpProxy` 已传,LLM 能出站(curl 测 models 接口)
+> nginx 的 `/pi/` location 未激活时(`reload` 前),`/pi/*` 请求落在 `location /` 通配 → 可能 404,不影响其他 site。
 
-## 临时调试(不走服务)
+## 运维
 
-git bash 里 `./deploy/start.sh`(已内置 `NO_PROXY`),用当前账户的 `~/.pi`。仅供调试。
+### pi-web 升级
 
----
+```bash
+cd D:\Programs\pi-web
+git merge upstream/main
+bun install             # 依赖若变
+tsc --noEmit            # 类型检查
+# bun run build         # 生产:从真实路径 D:\Programs 跑
+servy-cli restart --name=pi-web-shared
+```
 
-## 多实例隔离(如果以后要每人独立 ~/.pi)
+### Node 升级
 
-当前单实例够用就忽略。要隐私隔离:每人各跑一次 `install-instance.ps1`(不同 Instance/端口/PiHome),Caddyfile 每人一个 site block。代价是升级时 restart N 次。`deploy/linux/pi-web@.service` 是 Linux 下的等价方案(systemd 模板)。
+servy 服务写死 `C:\nvm4w\nodejs\node.exe`(符号链接),`nvm use` 改指向后 restart 即可,**无需重新注册服务**。
+
+### 环境变量备忘
+
+| 变量 | 值 | 为什么 |
+| --- | --- | --- |
+| `NO_PROXY` | `localhost,127.0.0.1` | 否则 undici 代理绑架本地 API 请求 |
+| `PI_WEB_BASE_PATH` | `/pi` | 激活 basePath monkey-patch |
+| `HTTP_PROXY` | `http://127.0.0.1:19718` | LLM 出站(国内需要) |
+
+## 踩坑记录
+
+| 问题 | 症状 | 根因 | 解 |
+| --- | --- | --- | --- |
+| Turbopack + junction | `EPERM: Symlink ... points out of the filesystem root` | dev 模式(Turbopack)拒绝指向项目外部的 node_modules symlink/junction | worktree 复制必须真 `bun install` |
+| `next build` EPERM | `EPERM scandir 'Application Data'` | 符号链接 cwd `C:\Users\CyYu\D-Programs` → webpack glob 扫描祖先撞受限 junction | 从真实路径 `D:\Programs\pi-web` 跑 build |
+| `dev` 脚本硬编码 `-p 30141` | `EADDRINUSE`,第二实例起不来 | package.json `"dev": "next dev -p 30141"` | `bun run dev -- --port 30150` |
+| 忘设 `NO_PROXY` | 首页正常,所有 API 超时 30s | undici `EnvHttpProxyAgent` 把 `127.0.0.1` 也代理 | 必须设 |
+| `proxy_pass` 尾斜杠 | `/pi/api/sessions` 到后端变 `/api/sessions` → 404 | nginx `proxy_pass http://x/`(带尾斜杠)会剥 location 前缀 | pi-web 需要保留前缀,用 `proxy_pass http://x`(**不带**尾斜杠) |
+| auth_server 重启踢用户 | 所有 TOTP session 失效 | 令牌存内存,重启清零 | 与 nginx reload 捆绑,低峰期操作 |
