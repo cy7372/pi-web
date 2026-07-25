@@ -3,12 +3,20 @@
 ## Quick Start
 
 ```bash
-npm run dev   # port 30141
+# 根路径模式(默认,本地开发首选):
+bun run dev   # → http://localhost:30141/
+
+# /pi 子路径模式(模拟生产环境):
+# Windows MSYS2/git-bash 必须加 MSYS_NO_PATHCONV=1,否则 /pi 会被转成 C:/Program Files/Git/pi
+MSYS_NO_PATHCONV=1 PI_WEB_BASE_PATH=/pi bun run dev   # → http://localhost:30141/pi
+# 简写:
+MSYS_NO_PATHCONV=1 bun run dev:pi
 ```
 
 Typecheck: `node_modules/.bin/tsc --noEmit`  
-Lint: `npm run lint`  
-**Never run `next build` during dev** — pollutes `.next/` and breaks `npm run dev`.
+Lint: `bun run lint`  
+Build: `MSYS_NO_PATHCONV=1 bun run build` (Turbopack, 不要加 --webpack)  
+**Never run `next build` during dev** — pollutes `.next/` and breaks `bun run dev`.
 
 ---
 
