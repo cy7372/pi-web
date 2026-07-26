@@ -28,7 +28,7 @@
     "dev": "next dev -p 30141",
     "dev:pi": "PI_WEB_BASE_PATH=/pi next dev -p 30141",
     "build": "PI_WEB_BASE_PATH=/pi next build",
-    "start": "next start -p 30141",
+    "start": "PI_WEB_BASE_PATH=/pi next start -p 30141",
     "lint": "eslint .",
     "release": "npm version patch --no-git-tag-version && npm run build && npm publish --access public"
   },
