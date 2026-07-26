@@ -58,3 +58,10 @@ lpt3
 *.db-wal
 *.db-shm
 *.recovery-*
+
+# pi-web 本地启动/停止脚本与运行时产物(非仓库内容)
+/start-pi-web.ps1
+/stop-pi-web.ps1
+/pi-web.log
+/pi-web.pid
+/pi-web.server.pid
