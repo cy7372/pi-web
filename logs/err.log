@@ -1,3 +1,0 @@
-$ PI_WEB_BASE_PATH=/pi next start -H 127.0.0.1 -p 30141
-^C
-$ PI_WEB_BASE_PATH=/pi next start -H 127.0.0.1 -p 30141

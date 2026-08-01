@@ -65,3 +65,10 @@ lpt3
 /pi-web.log
 /pi-web.pid
 /pi-web.server.pid
+
+# build artifacts (USERPROFILE bypass dir + transient build log)
+/.build-home/
+/build-full.log
+
+# runtime logs (Servy-managed)
+/logs/
