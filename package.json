@@ -1,6 +1,6 @@
 {
   "name": "@agegr/pi-web",
-  "version": "0.8.0",
+  "version": "0.8.6",
   "description": "Web UI for the pi coding agent",
   "homepage": "https://github.com/agegr/pi-web#readme",
   "repository": {
@@ -11,6 +11,9 @@
     "url": "https://github.com/agegr/pi-web/issues"
   },
   "license": "MIT",
+  "engines": {
+    "node": ">=22.19.0"
+  },
   "bin": {
     "pi-web": "bin/pi-web.js"
   },
@@ -25,21 +28,21 @@
     "package.json"
   ],
   "scripts": {
-    "dev": "next dev -p 30141",
-    "dev:pi": "PI_WEB_BASE_PATH=/pi next dev -p 30141",
-    "build": "PI_WEB_BASE_PATH=/pi next build",
-    "build:root": "next build",
-    "start": "PI_WEB_BASE_PATH=/pi next start -p 30141",
-    "start:root": "next start -p 30141",
+    "dev": "next dev -H 127.0.0.1 -p 30141",
+    "dev:lan": "next dev -H 0.0.0.0 -p 30141",
+    "build": "next build --webpack",
+    "start": "next start -H 127.0.0.1 -p 30141",
+    "start:lan": "next start -H 0.0.0.0 -p 30141",
     "lint": "eslint .",
     "release": "npm version patch --no-git-tag-version && npm run build && npm publish --access public"
   },
   "dependencies": {
-    "@earendil-works/pi-agent-core": "0.81.1",
-    "@earendil-works/pi-ai": "0.81.1",
-    "@earendil-works/pi-coding-agent": "0.81.1",
-    "@earendil-works/pi-tui": "0.81.1",
-    "next": "16.2.9",
+    "@earendil-works/pi-agent-core": "0.83.0",
+    "@earendil-works/pi-ai": "0.83.0",
+    "@earendil-works/pi-coding-agent": "0.83.0",
+    "@earendil-works/pi-tui": "0.83.0",
+    "next": "16.2.12",
+    "proper-lockfile": "4.1.2",
     "react": "^19.2.4",
     "react-dom": "^19.2.4",
     "undici": "8.5.0"
@@ -48,11 +51,12 @@
     "@lobehub/icons": "^5.6.0",
     "@tailwindcss/postcss": "^4.2.2",
     "@types/node": "^25",
+    "@types/proper-lockfile": "4.1.4",
     "@types/react": "^19",
     "@types/react-dom": "^19",
     "@types/react-syntax-highlighter": "^15.5.13",
     "eslint": "^9",
-    "eslint-config-next": "16.2.9",
+    "eslint-config-next": "16.2.12",
     "jiti": "^2.7.0",
     "katex": "^0.16.47",
     "mammoth": "^1.12.0",
