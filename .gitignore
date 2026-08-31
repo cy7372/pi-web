@@ -72,3 +72,5 @@ lpt3
 
 # runtime logs (Servy-managed)
 /logs/
+e2e_*.mjs
+
