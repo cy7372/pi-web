@@ -919,9 +919,11 @@ export function ChatWindow({ session, sessionRunning, newSessionCwd, newSessionD
               <MessageView message={streamState.streamingMessage as AgentMessage} isStreaming modelNames={modelNames} cwd={messageCwd} onOpenFile={onOpenFile} onOpenSession={onOpenSession} />
             )}
 
-            {agentRunning && !hasStreamingContent && agentPhase && (
+            {(agentRunning || isCompacting) && !hasStreamingContent && (isCompacting || agentPhase) && (
               <div className="break-words py-2 text-[13px] text-text-muted">
-                <span className="animate-[pulse_1.5s_infinite]">{phaseLabel(agentPhase, t)}</span>
+                <span className="animate-[pulse_1.5s_infinite]">
+                  {isCompacting ? t("chat.compacting") : phaseLabel(agentPhase, t)}
+                </span>
               </div>
             )}
 
