@@ -284,6 +284,7 @@ export function ChatWindow({ session, sessionRunning, newSessionCwd, newSessionD
     agentRunning, bashRunning, pendingBash, modelNames, modelList, modelError, modelScopeWarnings, modelThinkingLevels, modelThinkingLevelMaps, toolPreset, thinkingLevel,
     retryInfo, contextUsage, forkingEntryId,
     isCompacting, compactError, compactResult, displayModel: displayModelValue, modelSwitching, sessionStats,
+    truncationBanner, setTruncationBanner,
     slashCommands, slashCommandsLoading, queuedMessages,
     notices, extensionDialog, extensionCustomUi, extensionStatuses, extensionWidgets, respondToExtensionUi, sendExtensionCustomInput, setNoticePaused,
     isAutoModelSelection,
@@ -724,6 +725,20 @@ export function ChatWindow({ session, sessionRunning, newSessionCwd, newSessionD
       ) : (
       <>
       <div className="relative flex min-w-0 flex-1 overflow-hidden">
+        {truncationBanner && (
+          <div style={{ position: "absolute", top: 8, left: "50%", transform: "translateX(-50%)", zIndex: 30, width: "min(720px, calc(100% - 32px))" }}>
+            <div style={{ display: "flex", alignItems: "flex-start", gap: 10, background: "var(--bg-panel)", border: "1px solid #d97706", borderRadius: 8, padding: "8px 12px", boxShadow: "0 4px 16px rgba(0,0,0,0.35)" }}>
+              <span style={{ flex: 1, fontSize: 12.5, color: "var(--text)", lineHeight: 1.5, whiteSpace: "pre-wrap", wordBreak: "break-word" }}>{truncationBanner}</span>
+              <button
+                onClick={() => setTruncationBanner(null)}
+                aria-label="Dismiss"
+                style={{ color: "var(--text-muted)", background: "none", border: "none", cursor: "pointer", fontSize: 14, lineHeight: 1, padding: 2, flexShrink: 0 }}
+              >
+                ×
+              </button>
+            </div>
+          </div>
+        )}
         <div ref={scrollContainerRef} className="min-w-0 flex-1 overflow-x-hidden overflow-y-auto pt-4 [scrollbar-width:none]">
           <div style={{ minWidth: 0, padding: `0 ${CHAT_COLUMN_PADDING}px` }}>
             <div ref={messageContentRef} style={{ width: "100%", minWidth: 0, maxWidth: 820, margin: "0 auto" }}>

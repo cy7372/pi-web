@@ -228,6 +228,30 @@ function noticeReducer(state: NoticeState, action: NoticeAction): NoticeState {
   }
 }
 
+/**
+ * cyRouter injects a human-readable notice ("> ⚠️ cyRouter：… 静默断流…") into
+ * truncated streams, then synthesizes stopReason="length" so pi-core triggers
+ * auto-compaction+retry. The truncated assistant message is paged out of the
+ * render window quickly on tool-heavy turns (default tail=50 entries), leaving
+ * no visible trace of the incident. Detect that combo so the UI can pin a
+ * dismissible banner instead. Returns the one-line notice text, or null.
+ */
+function extractTruncationNotice(message: AgentMessage): string | null {
+  if (message.role !== "assistant") return null;
+  if ((message as { stopReason?: string }).stopReason !== "length") return null;
+  const content = (message as { content?: unknown }).content;
+  if (!Array.isArray(content)) return null;
+  const text = content
+    .map((block) =>
+      block && typeof block === "object" && (block as { type?: string }).type === "text"
+        ? String((block as { text?: unknown }).text ?? "")
+        : "",
+    )
+    .join("\n");
+  const match = text.match(/⚠️\s*cyRouter[：:][^\n]*/);
+  return match ? match[0].trim() : null;
+}
+
 function readCompactResult(result: unknown, reason: string): CompactResultInfo | null {
   if (!result || typeof result !== "object") return null;
   const r = result as CompactCommandResult;
@@ -306,6 +330,7 @@ export function useAgentSession(opts: UseAgentSessionOptions) {
   const [pendingModel, setPendingModel] = useState<{ provider: string; modelId: string } | null>(null);
   const [modelSwitching, setModelSwitching] = useState(false);
   const [isCompacting, setIsCompacting] = useState(false);
+  const [truncationBanner, setTruncationBanner] = useState<string | null>(null);
   const [compactError, setCompactError] = useState<string | null>(null);
   const [compactResult, setCompactResult] = useState<CompactResultInfo | null>(null);
   const [agentPhase, setAgentPhase] = useState<AgentPhase>(null);
@@ -384,6 +409,11 @@ export function useAgentSession(opts: UseAgentSessionOptions) {
     if (!existingSessionId && (!isNew || sessionIdRef.current)) return;
     setToolPresetState(getPreferredToolPreset());
   }, [existingSessionId, isNew, setToolPresetState]);
+
+  // Session switch: drop any pinned truncation banner from the previous session.
+  useEffect(() => {
+    setTruncationBanner(null);
+  }, [existingSessionId]);
 
   const scrollToBottom = useCallback((behavior: ScrollBehavior = "smooth") => {
     const container = scrollContainerRef.current;
@@ -1193,6 +1223,10 @@ export function useAgentSession(opts: UseAgentSessionOptions) {
           });
         } else if (completed) {
           setMessages((prev) => [...prev, normalizeToolCalls(completed)]);
+          // Pin cyRouter truncation notices (see extractTruncationNotice) —
+          // otherwise the incident vanishes from view with no trace.
+          const truncationNotice = extractTruncationNotice(completed);
+          if (truncationNotice) setTruncationBanner(truncationNotice);
         }
         dispatch({ type: "end" });
         setAgentPhase({ kind: "waiting_model" });
@@ -1281,6 +1315,7 @@ export function useAgentSession(opts: UseAgentSessionOptions) {
       return;
     }
     const isSlashCommandPrompt = !images?.length && trimmedMessage.startsWith("/");
+    setTruncationBanner(null);
 
     const isBashCommand = !images?.length && trimmedMessage.startsWith("!");
     if (isBashCommand) {
@@ -2008,6 +2043,7 @@ export function useAgentSession(opts: UseAgentSessionOptions) {
     agentRunning, modelNames, modelList, modelError, modelScopeWarnings, modelThinkingLevels, modelThinkingLevelMaps, newSessionModel, toolPreset, thinkingLevel,
     retryInfo, contextUsage, systemPrompt, forkingEntryId,
     isCompacting, compactError, compactResult, currentModel, displayModel, modelSwitching, sessionStats,
+    truncationBanner,
     slashCommands, slashCommandsLoading, queuedMessages,
     notices: noticeState.visible, extensionDialog, extensionCustomUi, extensionStatuses, extensionWidgets, respondToExtensionUi, sendExtensionCustomInput,
     isAutoModelSelection: isNew && newSessionModel === null,
@@ -2025,7 +2061,7 @@ export function useAgentSession(opts: UseAgentSessionOptions) {
     setNoticePaused: setPausedNoticeId,
     handleToolPresetChange, handleThinkingLevelChange, loadTools, loadSlashCommands, setActiveLeafId, setData, setMessages, loadContext,
     scrollToBottom, scrollUserMsgToTop,
-    dispatch, setAgentRunning, setForkingEntryId,
+    dispatch, setAgentRunning, setForkingEntryId, setTruncationBanner,
     bashRunning, pendingBash,
     // Subscriptions
     handleAgentEventRef,
