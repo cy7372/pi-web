@@ -28,9 +28,10 @@
     "package.json"
   ],
   "scripts": {
-    "dev": "next dev -H 127.0.0.1 -p 30141",
-    "dev:lan": "next dev -H 0.0.0.0 -p 30141",
-    "build": "next build --webpack",
+    "preinstall": "node -e \"const raw=process.env.npm_execpath; const base=raw?raw.toLowerCase().split(String.fromCharCode(92)).pop().split('/').pop():''; if(raw && base!=='bun' && base!=='bun.exe' && base!=='bunx') { console.error('[pi-web] wrong package manager: '+base+' ('+raw+') - this repo uses bun. Run: bun install'); process.exit(1) }\"",
+    "dev": "node deploy/dev.mjs -H 127.0.0.1 -p 30141",
+    "dev:lan": "node deploy/dev.mjs -H 0.0.0.0 -p 30141",
+    "build": "node deploy/build.mjs",
     "start": "next start -H 127.0.0.1 -p 30141",
     "start:lan": "next start -H 0.0.0.0 -p 30141",
     "lint": "eslint .",

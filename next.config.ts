@@ -13,6 +13,13 @@ try {
 
 const nextConfig: NextConfig = {
   outputFileTracingRoot: configDir,
+  // 2026-09-04: separate dev output from the production .next. Sharing one
+  // dir let `next dev` clobber the Servy-served production build (and vice
+  // versa: a production build breaks a running dev server). start-servy.cmd
+  // fail-fasts on a missing .next/BUILD_ID, so dev must never touch .next.
+  // Judge by PI_WEB_DEV (set by deploy/dev.mjs), NOT NODE_ENV/argv: config
+  // loads in a Turbopack worker where those signals are absent or polluted.
+  distDir: process.env.PI_WEB_DEV ? ".next-dev" : ".next",
   serverExternalPackages: [
     "undici",
     "web-push",

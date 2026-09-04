@@ -3,28 +3,65 @@
 ## Quick Start
 
 ```bash
-# 根路径模式(默认,本地开发首选):
+# 根路径模式（生产同构，本地开发首选）:
 bun run dev   # → http://localhost:30141/
-
-# /pi 子路径模式(模拟生产环境):
-# Windows MSYS2/git-bash 必须加 MSYS_NO_PATHCONV=1,否则 /pi 会被转成 C:/Program Files/Git/pi
-MSYS_NO_PATHCONV=1 PI_WEB_BASE_PATH=/pi bun run dev   # → http://localhost:30141/pi
-# 简写:
-MSYS_NO_PATHCONV=1 bun run dev:pi
+# 生产服务占用 30141 时，换端口：bun run dev -- -p 30199
 ```
 
 Typecheck: `node_modules/.bin/tsc --noEmit`  
 Lint: `bun run lint`  
-Build: `MSYS_NO_PATHCONV=1 bun run build` (Turbopack, 不要加 --webpack)  
-**Never run `next build` during dev** — pollutes `.next/` and breaks `bun run dev`.
+Build: `bun run build` — production build (`--webpack`, isolated HOME via deploy/build.mjs; any entrypoint works, no env prep needed).  
+Dev/build outputs are SEPARATE since 2026-09-04: `bun run dev` writes `.next-dev/` (via deploy/dev.mjs + PI_WEB_DEV flag), `bun run build` writes `.next/`. They no longer clobber each other, but still avoid running a build while the Servy production service is serving from `.next/` (do a build+restart pair via deploy\deploy.cmd).
 
 ### Dev server troubleshooting
 
-- Before starting a server, run `lsof -nP -iTCP:30141 -sTCP:LISTEN` and reuse the existing Pi Web process when it is healthy. A second `next dev` for the same checkout cannot use a different port as a workaround because both processes contend for `.next/dev/lock`.
+- Before starting a server, run `lsof -nP -iTCP:30141 -sTCP:LISTEN` and reuse the existing Pi Web process when it is healthy. Note the production Servy service also binds 30141 — for a local dev server pick another port (`bun run dev -- -p 30199`), dev output lives in `.next-dev/` and cannot touch the production `.next/`.
 - A browser-only `Module ... factory is not available` overlay usually means that tab has a stale Turbopack/HMR graph; it does not prove the server or source is broken. First call the browser's explicit reload action, then compare the current server log and a direct HTTP/API request.
-- Restart only after the failure reproduces from a fresh page and the server-side checks also fail. Stop the exact dev process gracefully, move `.next` into a `mktemp -d` backup, and restart with the standard `npm run dev` command.
+- Restart only after the failure reproduces from a fresh page and the server-side checks also fail. Stop the exact dev process gracefully, move `.next-dev` into a `mktemp -d` backup, and restart with the standard `bun run dev` command.
 - Do not use `next dev --webpack` as a fallback. This repository's development graph can fail on `undici` imports such as `node:console`; development is expected to use Turbopack.
 - Next.js may append a generated `BEGIN:nextjs-agent-rules` block to `AGENTS.md` when `next dev` starts. Treat that as generated tooling output, verify it with `git status`, and do not include it in an unrelated feature commit.
+
+---
+
+## Production Deployment (PiWeb / pi.cyyu.me)
+
+One command (admin console, from repo root or anywhere):
+
+```
+D:\Programs\pi-web\deploy\deploy.cmd
+```
+
+Steps it runs: `bun install` → `bun run build` → `servy-cli restart --name=PiWeb`.
+Non-admin console: it stops after build and prints the sudo restart line —
+finish manually: `sudo servy-cli restart --name=PiWeb`.
+
+### Guardrails (why each piece exists — 2026-09-04 incident)
+
+- **bun-only installs**: `package.json` `preinstall` aborts when `npm_execpath`
+  isn't bun (npm/pnpm/yarn). npm rewires `node_modules/.bin` and breaks
+  `bun run start` (`could not find bin metadata file`). Do not bypass.
+- **Isolated build HOME**: `bun run build` = `node deploy/build.mjs`, which
+  points HOME/USERPROFILE at `.build-home/`. Real profile has legacy junctions
+  with Deny ACLs — Next 16 webpack tracing walks them → EPERM or 8 GB OOM.
+- **Registry pinned**: `bunfig.toml` fixes npmmirror so `bun install` never
+  rewrites `bun.lock` URLs again (the diff stays clean).
+- **Fail-fast launcher**: `deploy/start-servy.cmd` (Servy runs it, as SYSTEM)
+  exits 1 with a clear message when `.next/BUILD_ID` is missing, and
+  propagates bun's exit code (`endlocal & exit /b %errorlevel%`) so Servy's
+  RestartService recovery actually fires. HTTP bindings/env: loopback
+  30141, `PI_WEB_HOSTNAME=pi.cyyu.me`, HOME→real profile (session store).
+- **dev/build split**: dev writes `.next-dev/`, production serves `.next/`.
+
+### Incident triage cheatsheet
+
+- Service state: `sc query PiWeb`; events: Windows Event Log → Application →
+  source `Servy` (start/stop/child-exit with codes).
+- App logs: `D:\Programs\pi-web\logs\out.log` / `err.log` — **UTF-16LE**,
+  read with an encoding-aware tool (or `iconv -f UTF-16LE`).
+- Upstream health: `curl http://127.0.0.1:30141/` (expect 200).
+- Through nginx with mTLS: no cert → 423; wrong-CA cert → 400; valid cert +
+  no basic auth → 401. All three mean nginx is fine — keep digging upstream.
+- Do NOT edit `bun.lock` by hand; if it drifts, `bun install` regenerates.
 
 ---
 

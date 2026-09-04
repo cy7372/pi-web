@@ -1,0 +1,15 @@
+# Pin the install registry to npmmirror (2026-09-04).
+#
+# The global ~/.npmrc already sets registry=https://registry.npmmirror.com,
+# which means every `bun install` rewrites bun.lock URLs from the official
+# registry to mirror URLs — the lock diff flip-flops forever (observed as a
+# ~2000-line churn after the 2026-09-04 incident repair).
+#
+# Pinning it HERE makes the mirror choice explicit and stable:
+#   - bun.lock (npmmirror URLs) is now the canonical committed state
+#   - installs no longer produce spurious lock diffs
+#
+# npm is not affected by this file; npm installs are blocked by the
+# package.json preinstall guard anyway (this repo is bun-only, bun.lock).
+[install]
+registry = "https://registry.npmmirror.com"
