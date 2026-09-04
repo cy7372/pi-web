@@ -40,6 +40,8 @@ finish manually: `sudo servy-cli restart --name=PiWeb`.
 - **bun-only installs**: `package.json` `preinstall` aborts when `npm_execpath`
   isn't bun (npm/pnpm/yarn). npm rewires `node_modules/.bin` and breaks
   `bun run start` (`could not find bin metadata file`). Do not bypass.
+  `package-lock.json` stays tracked ONLY for upstream merge compatibility
+  (upstream uses npm); this repo never consumes it — `bun.lock` is canonical.
 - **Isolated build HOME**: `bun run build` = `node deploy/build.mjs`, which
   points HOME/USERPROFILE at `.build-home/`. Real profile has legacy junctions
   with Deny ACLs — Next 16 webpack tracing walks them → EPERM or 8 GB OOM.
@@ -277,3 +279,19 @@ Location: `~/.pi/agent/sessions/<encoded-cwd>/<timestamp>_<uuid>.jsonl`
 --accent --user-bg --tool-bg
 --font-mono
 ```
+
+---
+
+## Cross-project memory rule (2026-09-04)
+
+Operational facts about the cyyu.me stack (nginx / pi-web / Servy / gateway —
+restart procedures, incident root causes, port ownership rules) must be written
+to the **global** yinor partition (`group=default`), not this project's
+partition. Sessions in other directories (e.g. `~/.pi`, `Run/nginx`) cannot see
+project-partition facts — the 09-04 503 outage happened because two partitions
+each held half of the truth.
+
+After ANY restart/deploy of pi-web, verify hand-back:
+`netstat -ano | findstr :30141` → owning PID must be a child of the Servy
+PiWeb service. If a manually-started `next start` survived (restart.cmd path),
+kill it and `sudo servy-cli restart --name=PiWeb`, then re-verify.

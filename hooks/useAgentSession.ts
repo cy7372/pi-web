@@ -20,6 +20,27 @@ import { getPresetFromToolNames, getToolNamesForPreset, type ToolEntry, type Too
 import type { SessionStatsInfo } from "@/lib/pi-types";
 import { mergeSessionStats, type SessionFileStats } from "@/lib/session-stats";
 import { userMessageKey } from "@/lib/prompt-recovery";
+
+// [dup-probe] Log-only diagnostics for the "user message renders twice" report.
+// Wraps the messages setter: every list mutation reports its source path and
+// warns (with a stack trace) when the resulting list holds a duplicate user key.
+// No behavior change; remove once the root cause is captured.
+function probeUserKey(m: unknown): string | null {
+  if (!m || typeof m !== "object" || (m as { role?: unknown }).role !== "user") return null;
+  try { return userMessageKey(m as Parameters<typeof userMessageKey>[0]).slice(0, 120); } catch { return null; }
+}
+function probeScan(source: string, prev: AgentMessage[], next: AgentMessage[]) {
+  const seen = new Set<string>();
+  for (const m of next) {
+    const k = probeUserKey(m);
+    if (k === null) continue;
+    if (seen.has(k)) {
+      console.warn(`[dup-probe] DUPLICATE user message after ${source}: key=${k} prevLen=${prev.length} nextLen=${next.length}`, new Error("trace").stack);
+      return;
+    }
+    seen.add(k);
+  }
+}
 import { AgentEventConnection } from "@/lib/agent-event-connection";
 import { getToolExecutionProgress } from "@/lib/tool-execution-progress";
 import {
@@ -74,6 +95,7 @@ type AgentStateResponse = {
   isPromptRunning?: boolean;
   isBashRunning?: boolean;
   isCompacting?: boolean;
+  autoCompactionEnabled?: boolean;
   extensionStatuses?: ExtensionStatusItem[];
   extensionWidgets?: ExtensionWidgetItem[];
   queuedMessages?: { steering?: string[]; followUp?: string[] } | null;
@@ -304,7 +326,22 @@ export function useAgentSession(opts: UseAgentSessionOptions) {
   const [loading, setLoading] = useState(!isNew);
   const [error, setError] = useState<string | null>(null);
   const [activeLeafId, setActiveLeafId] = useState<string | null>(null);
-  const [messages, setMessages] = useState<AgentMessage[]>([]);
+  const [messages, setMessagesBase] = useState<AgentMessage[]>([]);
+  // [dup-probe] intercept every mutation with its call-site stack tag.
+  const probeTagRef = useRef<string>("");
+  const setMessages = useCallback((
+    updaterOrValue: AgentMessage[] | ((prev: AgentMessage[]) => AgentMessage[]),
+    probeTag?: string,
+  ) => {
+    if (probeTag) probeTagRef.current = probeTag;
+    setMessagesBase((prev) => {
+      const next = typeof updaterOrValue === "function"
+        ? (updaterOrValue as (p: AgentMessage[]) => AgentMessage[])(prev)
+        : updaterOrValue;
+      if (next !== prev) probeScan(probeTag || probeTagRef.current || "setMessages", prev, next);
+      return next;
+    });
+  }, []);
   const [entryIds, setEntryIds] = useState<string[]>([]);
   const [historyCursor, setHistoryCursor] = useState<string | null>(null);
   const [hasEarlierMessages, setHasEarlierMessages] = useState(false);
@@ -330,6 +367,7 @@ export function useAgentSession(opts: UseAgentSessionOptions) {
   const [pendingModel, setPendingModel] = useState<{ provider: string; modelId: string } | null>(null);
   const [modelSwitching, setModelSwitching] = useState(false);
   const [isCompacting, setIsCompacting] = useState(false);
+  const [autoCompactionEnabled, setAutoCompactionEnabled] = useState(true);
   const [truncationBanner, setTruncationBanner] = useState<string | null>(null);
   const [compactError, setCompactError] = useState<string | null>(null);
   const [compactResult, setCompactResult] = useState<CompactResultInfo | null>(null);
@@ -489,7 +527,7 @@ export function useAgentSession(opts: UseAgentSessionOptions) {
         if (showLoading) {
           setData(null);
           setActiveLeafId(null);
-          setMessages([]);
+          setMessages([], "loadSession:404-clear");
           setEntryIds([]);
           setHistoryCursor(null);
           setHasEarlierMessages(false);
@@ -503,7 +541,7 @@ export function useAgentSession(opts: UseAgentSessionOptions) {
       const persistedMessages = d.context.messages;
       setData(d);
       setActiveLeafId(d.leafId);
-      setMessages(persistedMessages);
+      setMessages(persistedMessages, "loadSession:replace");
       setEntryIds(d.context.entryIds ?? []);
       setHistoryCursor(d.context.oldestEntryId);
       setHasEarlierMessages(d.context.hasMore);
@@ -575,10 +613,10 @@ export function useAgentSession(opts: UseAgentSessionOptions) {
       });
       if (before) {
         // Older page: prepend so scroll position stays anchored.
-        setMessages((prev) => [...d.context.messages, ...prev]);
+        setMessages((prev) => [...d.context.messages, ...prev], "loadContext:prepend");
         setEntryIds((prev) => [...d.context.entryIds, ...prev]);
       } else {
-        setMessages(d.context.messages);
+        setMessages(d.context.messages, "loadContext:replace");
         setEntryIds(d.context.entryIds ?? []);
       }
     } catch (e) {
@@ -1023,6 +1061,7 @@ export function useAgentSession(opts: UseAgentSessionOptions) {
       // would otherwise leave the "Stop compaction" UI stuck. No state
       // (wrapper destroyed) means nothing is compacting.
       setIsCompacting(state?.isCompacting ?? false);
+      setAutoCompactionEnabled(state?.autoCompactionEnabled ?? true);
       setQueuedMessages(normalizeQueuedMessages(state?.queuedMessages));
       const busy = data.running && state
         && (state.isStreaming || state.isPromptRunning || state.isCompacting);
@@ -1220,9 +1259,9 @@ export function useAgentSession(opts: UseAgentSessionOptions) {
                 : [...prev.slice(0, -1), delivered];
             }
             return [...prev, delivered];
-          });
+          }, "message_end:user");
         } else if (completed) {
-          setMessages((prev) => [...prev, normalizeToolCalls(completed)]);
+          setMessages((prev) => [...prev, normalizeToolCalls(completed)], "message_end:other");
           // Pin cyRouter truncation notices (see extractTruncationNotice) —
           // otherwise the incident vanishes from view with no trace.
           const truncationNotice = extractTruncationNotice(completed);
@@ -1341,7 +1380,7 @@ export function useAgentSession(opts: UseAgentSessionOptions) {
         : message,
       timestamp: Date.now(),
     };
-    setMessages((prev) => [...prev, userMsg]);
+    setMessages((prev) => [...prev, userMsg], "handleSend:optimistic");
     optimisticUserMessageKeyRef.current = userMessageKey(userMsg);
     promptRunIdRef.current = promptRunId;
     agentRunningRef.current = true;
@@ -1408,7 +1447,7 @@ export function useAgentSession(opts: UseAgentSessionOptions) {
         return optimisticIndex === -1
           ? prev
           : [...prev.slice(0, optimisticIndex), ...prev.slice(optimisticIndex + 1)];
-      });
+      }, "handleSend:remove");
       addNotice({ type: "error", message: e instanceof Error ? e.message : String(e) });
       restoreSubmission(message, images, composerDraftKey);
       optimisticUserMessageKeyRef.current = null;
@@ -1639,6 +1678,14 @@ export function useAgentSession(opts: UseAgentSessionOptions) {
           return complete({ handled: true, message: "Compacted context" });
         }
 
+        case "auto-compact": {
+          if (!sid) return complete({ handled: true, error: "No active session" });
+          const nextEnabled = !autoCompactionEnabled;
+          await sendAgentCommand(sid, { type: "set_auto_compaction", enabled: nextEnabled });
+          setAutoCompactionEnabled(nextEnabled);
+          return complete({ handled: true, message: nextEnabled ? "Auto-compaction enabled" : "Auto-compaction disabled" });
+        }
+
         case "reload": {
           if (!sid) return complete({ handled: true, error: "No active session to reload" });
           await sendAgentCommand(sid, { type: "reload" });
@@ -1703,7 +1750,7 @@ export function useAgentSession(opts: UseAgentSessionOptions) {
     } finally {
       if (commandName === "compact") setIsCompacting(false);
     }
-  }, [activeLeafId, addNotice, ensureNewSession, isCompacting, loadModels, loadSession, loadSlashCommands, loadTools, promoteNewSession, onSessionForked, onSessionStatsPanelOpen]);
+  }, [activeLeafId, addNotice, autoCompactionEnabled, ensureNewSession, isCompacting, loadModels, loadSession, loadSlashCommands, loadTools, promoteNewSession, onSessionForked, onSessionStatsPanelOpen]);
 
   // Let AgentSession.prompt decide atomically whether to queue against the
   // current run or start a new turn if it settled while the request was in
@@ -1901,6 +1948,7 @@ export function useAgentSession(opts: UseAgentSessionOptions) {
         }
         if (agentState?.state) {
           if (agentState.state.isCompacting !== undefined) setIsCompacting(agentState.state.isCompacting);
+          if (agentState.state.autoCompactionEnabled !== undefined) setAutoCompactionEnabled(agentState.state.autoCompactionEnabled);
           if (agentState.state.contextUsage !== undefined) setContextUsage(agentState.state.contextUsage ?? null);
           if (agentState.state.systemPrompt !== undefined) setSystemPrompt(agentState.state.systemPrompt ?? null);
           if (agentState.state.thinkingLevel !== undefined) setThinkingLevel((agentState.state.thinkingLevel as ThinkingLevelOption) ?? "auto");

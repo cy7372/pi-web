@@ -605,6 +605,45 @@ pre, code {
 .compaction-file-list li + li {
   margin-top: 3px;
 }
+.compaction-toggle {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  padding: 7px 10px;
+  border: none;
+  background: var(--bg-panel);
+  color: var(--text-muted);
+  cursor: pointer;
+  text-align: left;
+}
+.compaction-toggle:hover {
+  background: var(--bg-hover);
+  color: var(--text);
+}
+.compaction-toggle[aria-expanded="true"] {
+  border-bottom: 1px solid var(--border);
+}
+.compaction-file-list li:has(> .compaction-file-link) {
+  padding: 0;
+}
+.compaction-file-link {
+  display: block;
+  width: 100%;
+  padding: 1px 3px;
+  border: none;
+  background: none;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+  overflow-wrap: anywhere;
+}
+.compaction-file-link:hover {
+  background: var(--bg-hover);
+  color: var(--text);
+  text-decoration: underline;
+}
 
 .markdown-code-block {
   position: relative;
