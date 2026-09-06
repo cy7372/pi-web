@@ -160,11 +160,19 @@ export type BuiltinSlashCommandResult =
   | { handled: false }
   | { handled: true; message?: string; error?: string; action?: "openSessionStats" };
 
+export interface AgentNoticeTexts {
+  /** Transient cue when an extension-injected custom message starts a new turn. */
+  extensionTurnStart: string;
+  /** Cue when the running agent turn is aborted. */
+  runAborted: string;
+}
+
 export interface UseAgentSessionOptions {
   session: SessionInfo | null;
   sessionRunning?: boolean;
   newSessionCwd: string | null;
   newSessionDraftKey: string | null;
+  noticeTexts?: Partial<AgentNoticeTexts>;
   onAgentEnd?: () => void;
   onAttentionNeeded?: (request: BlockingExtensionUiRequest) => void;
   onSessionCreated?: (session: SessionInfo, sourceDraftKey: string) => void;
@@ -319,6 +327,11 @@ export function useAgentSession(opts: UseAgentSessionOptions) {
     session, sessionRunning, newSessionCwd, newSessionDraftKey, onAgentEnd, onAttentionNeeded, onSessionCreated, onSessionForked,
     modelsRefreshKey, onBranchDataChange, onSystemPromptChange, onSystemToolsChange, onSystemInfoLoaderChange, onSessionStatsPanelOpen,
   } = opts;
+
+  const noticeTexts = useMemo<AgentNoticeTexts>(() => ({
+    extensionTurnStart: opts.noticeTexts?.extensionTurnStart ?? "Extension triggered a new run",
+    runAborted: opts.noticeTexts?.runAborted ?? "Run was interrupted",
+  }), [opts.noticeTexts?.extensionTurnStart, opts.noticeTexts?.runAborted]);
 
   const isNew = session === null && newSessionCwd !== null;
 
@@ -774,6 +787,22 @@ export function useAgentSession(opts: UseAgentSessionOptions) {
     eventConnectionRef.current!.maintain(sid);
   }, []);
 
+  // Reconcile when the tab becomes visible again: while hidden, the sidebar
+  // running-poll is suspended and the SSE stream may already be closed by the
+  // idle grace. Agent activity that started AND ended while hidden (e.g. an
+  // extension-injected auto-continue turn that got aborted) leaves no running
+  // flag for the poll to catch, so the transcript would stay stale forever.
+  useEffect(() => {
+    const onVisibilityChange = () => {
+      if (document.visibilityState !== "visible") return;
+      if (agentRunningRef.current) return; // live SSE covers running agents
+      const sid = sessionIdRef.current;
+      if (sid) void loadSession(sid);
+    };
+    document.addEventListener("visibilitychange", onVisibilityChange);
+    return () => document.removeEventListener("visibilitychange", onVisibilityChange);
+  }, [loadSession]);
+
   // A different browser can start this session after it was opened here.
   // The sidebar's lightweight running-state poll gives us a cheap signal to
   // attach to the existing SSE stream without adding another synchronization
@@ -1213,6 +1242,12 @@ export function useAgentSession(opts: UseAgentSessionOptions) {
             dispatch({ type: "snapshot", message: msg });
             if (msg.content.length > 0) setAgentPhase(null);
           } else if (msg) {
+            if (msg.role === "custom") {
+              // Extension-injected turn (status-core auto-continue, process wake-ups):
+              // the custom trigger message renders no bubble, so the restarted run
+              // would be completely invisible. Surface a transient cue instead.
+              addNotice({ type: "info", message: noticeTexts.extensionTurnStart });
+            }
             setAgentPhase(null);
           }
         } else {
@@ -1261,7 +1296,23 @@ export function useAgentSession(opts: UseAgentSessionOptions) {
             return [...prev, delivered];
           }, "message_end:user");
         } else if (completed) {
-          setMessages((prev) => [...prev, normalizeToolCalls(completed)], "message_end:other");
+          const stopReason = (completed as { stopReason?: string }).stopReason;
+          const aborted = stopReason === "aborted";
+          // An aborted turn that streamed nothing leaves an empty assistant
+          // message; skip it (invisible blank bubble) and surface the
+          // interruption as a notice instead.
+          const blocks = (("content" in completed ? completed.content : []) ?? []) as Array<{ type?: string; text?: string }>;
+          const hasContent = blocks.some((b) => {
+            if (!b || typeof b !== "object") return false;
+            if (b.type === "text") return Boolean(b.text?.trim());
+            return true;
+          });
+          if (!aborted || hasContent) {
+            setMessages((prev) => [...prev, normalizeToolCalls(completed)], "message_end:other");
+          }
+          if (aborted) {
+            addNotice({ type: "warning", message: noticeTexts.runAborted });
+          }
           // Pin cyRouter truncation notices (see extractTruncationNotice) —
           // otherwise the incident vanishes from view with no trace.
           const truncationNotice = extractTruncationNotice(completed);
@@ -1343,7 +1394,7 @@ export function useAgentSession(opts: UseAgentSessionOptions) {
         handleExtensionUiRequest(event as ExtensionUiRequest);
         break;
     }
-  }, [addNotice, cancelEventStreamGrace, handleExtensionUiRequest, loadSession, notifyPromptStage, onAgentEnd, scheduleEventStreamClose, scrollToBottom, settleUiStage]);
+  }, [addNotice, cancelEventStreamGrace, handleExtensionUiRequest, loadSession, noticeTexts, notifyPromptStage, onAgentEnd, scheduleEventStreamClose, scrollToBottom, settleUiStage]);
   handleAgentEventRef.current = handleAgentEvent;
 
   const handleSend = useCallback(async (message: string, images?: AttachedImage[]) => {

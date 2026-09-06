@@ -334,6 +334,8 @@ export const enLocale: LocalePlugin = {
     "chat.compact": "Compact",
     "chat.stopAgent": "Stop agent",
     "chat.stop": "Stop",
+    "agent.extensionTurnStart": "Extension triggered a new run",
+    "agent.runAborted": "Run was interrupted",
     "chat.disableSound": "Disable completion sound",
     "chat.enableSound": "Enable completion sound",
     "chat.thinkingUseDefault": "Use pi default",

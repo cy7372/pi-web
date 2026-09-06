@@ -301,6 +301,10 @@ export function ChatWindow({ session, sessionRunning, newSessionCwd, newSessionD
   } = useAgentSession({
     session, sessionRunning, newSessionCwd, newSessionDraftKey, onAgentEnd: wrappedOnAgentEnd, onAttentionNeeded, onSessionCreated, onSessionForked,
     modelsRefreshKey, chatInputRef, onBranchDataChange, onSystemPromptChange, onSystemToolsChange, onSystemInfoLoaderChange, onSessionStatsPanelOpen,
+    noticeTexts: {
+      extensionTurnStart: t("agent.extensionTurnStart"),
+      runAborted: t("agent.runAborted"),
+    },
   });
   const sessionBusy = agentRunning || bashRunning;
 

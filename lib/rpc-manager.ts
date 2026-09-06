@@ -145,13 +145,33 @@ const CODING_TOOL_NAMES = ["read", "bash", "powershell", "edit", "write", "grep"
 const THINKING_LEVEL_NAMES = new Set<ThinkingLevel>(["off", "minimal", "low", "medium", "high", "xhigh", "max"]);
 
 // Extensions require a complete Theme, while the web UI applies its own styling.
+// pi 0.85 widened the Theme constructor contract: fallbacks like
+// `scrollbarTrack ?? muted` now resolve for missing keys and crash
+// `fgAnsi(undefined)`, so pass a full palette of empty colors ("" is a legal
+// color value) instead of a minimal subset. `satisfies` keeps tsc watching
+// the constructor signature for future pi upgrades.
+const EMPTY_FG_COLORS = {
+  accent: "", border: "", borderAccent: "", borderMuted: "", success: "", error: "",
+  warning: "", muted: "", dim: "", text: "", thinkingText: "", userMessageText: "",
+  customMessageText: "", customMessageLabel: "", toolTitle: "", toolOutput: "",
+  mdHeading: "", mdLink: "", mdLinkUrl: "", mdCode: "", mdCodeBlock: "",
+  mdCodeBlockBorder: "", mdQuote: "", mdQuoteBorder: "", mdHr: "", mdListBullet: "",
+  toolDiffAdded: "", toolDiffRemoved: "", toolDiffContext: "", syntaxComment: "",
+  syntaxKeyword: "", syntaxFunction: "", syntaxVariable: "", syntaxString: "",
+  syntaxNumber: "", syntaxType: "", syntaxOperator: "", syntaxPunctuation: "",
+  thinkingOff: "", thinkingMinimal: "", thinkingLow: "", thinkingMedium: "",
+  thinkingHigh: "", thinkingXhigh: "", thinkingMax: "", bashMode: "",
+  scrollbarTrack: "", scrollbarThumb: "", searchMatchText: "",
+} satisfies ConstructorParameters<typeof Theme>[0];
+
+const EMPTY_BG_COLORS = {
+  selectedBg: "", searchMatchBg: "", userMessageBg: "", customMessageBg: "",
+  toolPendingBg: "", toolSuccessBg: "", toolErrorBg: "",
+} satisfies ConstructorParameters<typeof Theme>[1];
+
 class PlainTextTheme extends Theme {
   constructor() {
-    super(
-      { thinkingXhigh: "", searchMatchText: "" } as ConstructorParameters<typeof Theme>[0],
-      { selectedBg: "" } as ConstructorParameters<typeof Theme>[1],
-      "truecolor",
-    );
+    super(EMPTY_FG_COLORS, EMPTY_BG_COLORS, "truecolor");
   }
 
   override fg(...[, text]: Parameters<Theme["fg"]>): string { return text; }
@@ -331,7 +351,7 @@ export class AgentSessionWrapper {
             method: "notify",
             notifyType: "warning",
             message: "Extension requested shutdown, but shutdown is not supported in Pi Web.",
-          } as ExtensionUiRequest as AgentEvent),
+          } as ExtensionUiRequest),
           onError: (error) => this.emit({
             type: "extension_error",
             extensionPath: error.extensionPath,
@@ -1050,7 +1070,7 @@ export class AgentSessionWrapper {
       widgetKey: key,
       widgetLines: undefined,
       widgetPlacement: undefined,
-    } as ExtensionUiRequest as AgentEvent);
+    } as ExtensionUiRequest);
   }
 
   private clearExtensionWidget(key: string, emitClear = true): number {
@@ -1166,7 +1186,7 @@ export class AgentSessionWrapper {
       widgetKey: active.key,
       widgetLines,
       widgetPlacement: active.placement,
-    } as ExtensionUiRequest as AgentEvent);
+    } as ExtensionUiRequest);
   }
 
   private setExtensionWidgetFactory(
@@ -1243,7 +1263,7 @@ export class AgentSessionWrapper {
       id,
       method: "custom",
       lines,
-    } as ExtensionUiRequest as AgentEvent;
+    } as ExtensionUiRequest;
     this.pendingUiRequests.set(id, event);
     this.emit(event);
   }
@@ -1265,7 +1285,7 @@ export class AgentSessionWrapper {
       method: "custom",
       lines: [],
       closed: true,
-    } as ExtensionUiRequest as AgentEvent);
+    } as ExtensionUiRequest);
     custom.resolve(value);
   }
 
@@ -1434,7 +1454,7 @@ export class AgentSessionWrapper {
           method: "notify",
           message,
           notifyType: type,
-        } as ExtensionUiRequest as AgentEvent);
+        } as ExtensionUiRequest);
       },
       onTerminalInput: () => () => {},
       setStatus: (key, text) => {
@@ -1446,7 +1466,7 @@ export class AgentSessionWrapper {
           method: "setStatus",
           statusKey: key,
           statusText: text,
-        } as ExtensionUiRequest as AgentEvent);
+        } as ExtensionUiRequest);
       },
       setWorkingMessage: () => {},
       setWorkingVisible: () => {},
@@ -1483,7 +1503,7 @@ export class AgentSessionWrapper {
           widgetKey: key,
           widgetLines: content,
           widgetPlacement: options?.placement,
-        } as ExtensionUiRequest as AgentEvent);
+        } as ExtensionUiRequest);
       },
       setFooter: () => {},
       setHeader: () => {},
@@ -1493,7 +1513,7 @@ export class AgentSessionWrapper {
           id: randomUUID(),
           method: "setTitle",
           title,
-        } as ExtensionUiRequest as AgentEvent);
+        } as ExtensionUiRequest);
       },
       custom: <T = unknown>(factory: unknown, options?: unknown) => this.requestExtensionCustomUi<T>(factory, options),
       pasteToEditor: (text) => {
@@ -1502,7 +1522,7 @@ export class AgentSessionWrapper {
           id: randomUUID(),
           method: "set_editor_text",
           text,
-        } as ExtensionUiRequest as AgentEvent);
+        } as ExtensionUiRequest);
       },
       setEditorText: (text) => {
         this.emit({
@@ -1510,7 +1530,7 @@ export class AgentSessionWrapper {
           id: randomUUID(),
           method: "set_editor_text",
           text,
-        } as ExtensionUiRequest as AgentEvent);
+        } as ExtensionUiRequest);
       },
       getEditorText: () => "",
       addAutocompleteProvider: () => {},
