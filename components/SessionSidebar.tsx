@@ -963,8 +963,8 @@ export function SessionSidebar({ selectedSessionId, onSelectSession, onNewSessio
   // Per-project activity counts (running / unread) for the workspace selector.
   // Uses the same stable server key as the project list and filtering.
   const projectActivity = useMemo(
-    () => getProjectActivity(allSessions, runningSessionIds, unreadSessionIds),
-    [allSessions, runningSessionIds, unreadSessionIds],
+    () => getProjectActivity(allSessions, runningSessionIds, unreadSessionIds, awaitingInputSessionIds),
+    [allSessions, runningSessionIds, unreadSessionIds, awaitingInputSessionIds],
   );
 
   // Any activity in a project other than the one currently selected — shown as
@@ -972,7 +972,7 @@ export function SessionSidebar({ selectedSessionId, onSelectSession, onNewSessio
   // the dropdown.
   const hasOtherWorkspaceActivity = useMemo(
     () => [...projectActivity.entries()].some(
-      ([key, { running, unread }]) => key !== selectedProject?.key && (running > 0 || unread > 0),
+      ([key, { running, awaiting, unread }]) => key !== selectedProject?.key && (running > 0 || awaiting > 0 || unread > 0),
     ),
     [projectActivity, selectedProject],
   );
@@ -1992,12 +1992,28 @@ function UnreadSessionIndicator() {
  * the per-session indicators so the two stay visually consistent.
  */
 function showProjectActivity(
-  activity: { running: number; unread: number } | undefined,
+  activity: { running: number; awaiting: number; unread: number } | undefined,
   t: (key: string) => string,
 ): ReactNode {
-  if (!activity || (activity.running === 0 && activity.unread === 0)) return null;
+  if (!activity || (activity.running === 0 && activity.awaiting === 0 && activity.unread === 0)) return null;
   return (
     <span style={{ display: "inline-flex", alignItems: "center", gap: 5, flexShrink: 0, marginLeft: 6 }}>
+      {activity.awaiting > 0 && (
+        <span
+          title={t("sidebar.agentAwaitingInput")}
+          aria-label={`${t("sidebar.agentAwaitingInput")} (${activity.awaiting})`}
+          style={{ display: "inline-flex", alignItems: "center", gap: 3, color: "#e0a32e", fontSize: 10, fontFamily: "var(--font-mono)" }}
+        >
+          <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" style={{ display: "block" }}>
+            <path d="M21 11.5a8.4 8.4 0 0 1-8.5 8.3 8.9 8.9 0 0 1-3.8-.9L3 21l1.9-4.6a8.2 8.2 0 0 1-.9-3.9A8.4 8.4 0 0 1 12.5 3.2 8.4 8.4 0 0 1 21 11.5Z" />
+            <path d="M9.6 9.2a2.9 2.9 0 0 1 5.4 1c0 1.9-2.7 2.4-2.7 2.4">
+              <animate attributeName="opacity" values="1;0.3;1" dur="1.6s" repeatCount="indefinite" />
+            </path>
+            <line x1="12.3" y1="15.7" x2="12.3" y2="15.8" />
+          </svg>
+          {activity.awaiting}
+        </span>
+      )}
       {activity.running > 0 && (
         <span
           title={t("sidebar.agentRunning")}
