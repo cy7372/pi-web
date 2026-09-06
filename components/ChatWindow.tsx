@@ -13,6 +13,7 @@ import { ChatInput, type ChatInputHandle } from "./ChatInput";
 import { ChatMinimap, useMessageRefs } from "./ChatMinimap";
 import { ExtensionStatusBar } from "./ExtensionStatusBar";
 import { AnsiText } from "./AnsiText";
+import { MarkdownBody } from "./MarkdownBody";
 import { useI18n } from "@/hooks/useI18n";
 import { useAgentSession, type AgentPhase, type NoticeItem } from "@/hooks/useAgentSession";
 import { useDragDrop } from "@/hooks/useDragDrop";
@@ -1468,8 +1469,50 @@ function NoticeShelf({ notices, floating = false, onPauseChange }: { notices: No
 
 type ExtensionDialogRequest = Extract<ExtensionUiRequest, { method: "select" | "confirm" | "input" | "editor" }>;
 
+/**
+ * Structured rendering for ask_user_question's RPC fallback (pi-web runs in RPC
+ * mode, so that extension folds each option into `"N. label — description"`
+ * (em-dash U+2014, see rpiv-ask-user-question/rpc-fallback.ts formatOptionLine)
+ * and any option previews into the select title as `--- N. label preview ---`
+ * blocks. Detect those shapes and render them with real hierarchy + markdown;
+ * everything else (other extensions' dialogs) keeps the legacy plain rendering.
+ * The response value always echoes the original option string, so presentation
+ * changes cannot break the dialog protocol.
+ */
+function parseStructuredOption(option: string): { label: string; description: string } | null {
+  const m = /^(\d+)\.\s+(.+?)\s+—\s+(.+)$/.exec(option);
+  return m ? { label: m[2], description: m[3] } : null;
+}
+
+/** Split a dialog title into heading (first line), prose (remaining plain lines) and preview markdown (--- N. … preview --- blocks). */
+function splitDialogTitle(title: string): { heading: string; prose: string; preview: string } {
+  const lines = title.split("\n");
+  let previewFrom = -1;
+  for (let i = 0; i < lines.length; i++) {
+    if (/^---\s.+\spreview\s---\s*$/.test(lines[i])) {
+      previewFrom = i;
+      break;
+    }
+  }
+  const headingSource = (previewFrom === -1 ? title : lines.slice(0, previewFrom).join("\n")).trimEnd();
+  // `--- N. label preview ---` separators are not valid markdown (a thematic
+  // break line may not contain other text), so they would render as opaque
+  // paragraph noise — rewrite them into bold section headings.
+  const preview = previewFrom === -1
+    ? ""
+    : lines.slice(previewFrom).join("\n").trim().replace(/^---\s(.+?)\spreview\s---\s*$/gm, "**$1 preview**");
+  const firstNl = headingSource.indexOf("\n");
+  return {
+    heading: firstNl === -1 ? headingSource : headingSource.slice(0, firstNl),
+    prose: firstNl === -1 ? "" : headingSource.slice(firstNl + 1).trim(),
+    preview,
+  };
+}
+
 function getExtensionDialogSummary(request: ExtensionDialogRequest): string | undefined {
-  if (request.method === "select" && request.options.length > 0) return request.options[0];
+  if (request.method === "select" && request.options.length > 0) {
+    return parseStructuredOption(request.options[0])?.label ?? request.options[0];
+  }
   if (request.method === "confirm") {
     const firstLine = request.message.split("\n").find((line) => line.trim());
     return firstLine?.trim();
@@ -1489,6 +1532,7 @@ function ExtensionDialog({
   const [collapsed, setCollapsed] = useState(false);
   const [now, setNow] = useState(() => Date.now());
   const summary = getExtensionDialogSummary(request);
+  const dialogParts = useMemo(() => splitDialogTitle(request.title), [request.title]);
   const remainingSeconds = request.expiresAt === undefined
     ? null
     : Math.max(0, Math.ceil((request.expiresAt - now) / 1000));
@@ -1590,7 +1634,10 @@ function ExtensionDialog({
       >
         <div style={{ flexShrink: 0, display: "flex", alignItems: "flex-start", gap: 8, padding: "12px 14px", borderBottom: "1px solid var(--border)" }}>
           <div style={{ flex: 1, minWidth: 0 }}>
-            <div style={{ color: "var(--text)", fontSize: 14, fontWeight: 650 }}>{request.title}</div>
+            <div style={{ color: "var(--text)", fontSize: 14, fontWeight: 650, overflowWrap: "anywhere" }}>{dialogParts.heading}</div>
+            {dialogParts.prose && (
+              <div style={{ color: "var(--text-muted)", fontSize: 12.5, lineHeight: 1.55, whiteSpace: "pre-wrap", marginTop: 4, overflowWrap: "anywhere" }}>{dialogParts.prose}</div>
+            )}
             <div style={{ display: "flex", flexWrap: "wrap", gap: 8, marginTop: 3, color: "var(--text-dim)", fontSize: 11, fontFamily: "var(--font-mono)" }}>
               <span>{t("chat.extensionRequest")}</span>
               {countdown}
@@ -1630,6 +1677,11 @@ function ExtensionDialog({
           {request.method === "confirm" && (
             <div style={{ color: "var(--text-muted)", fontSize: 13, lineHeight: 1.6, whiteSpace: "pre-wrap" }}>{request.message}</div>
           )}
+          {request.method === "select" && dialogParts.preview && (
+            <div style={{ marginBottom: 12, padding: "8px 12px", borderRadius: 7, border: "1px solid var(--border)", background: "var(--bg-panel)", maxHeight: 280, overflowY: "auto" }}>
+              <MarkdownBody>{dialogParts.preview}</MarkdownBody>
+            </div>
+          )}
           {request.method === "select" && (
             <div
               onKeyDown={(event) => {
@@ -1646,27 +1698,35 @@ function ExtensionDialog({
               }}
               style={{ display: "grid", gap: 8 }}
             >
-              {request.options.map((option, index) => (
-                <button
-                  key={option}
-                  autoFocus={index === 0}
-                  onClick={() => onRespond(request, { value: option })}
-                  style={{
-                    width: "100%",
-                    padding: "9px 10px",
-                    borderRadius: 7,
-                    border: "1px solid var(--border)",
-                    background: "var(--bg-panel)",
-                    color: "var(--text)",
-                    cursor: "pointer",
-                    textAlign: "left",
-                    fontSize: 13,
-                    overflowWrap: "anywhere",
-                  }}
-                >
-                  {option}
-                </button>
-              ))}
+              {request.options.map((option, index) => {
+                const structured = parseStructuredOption(option);
+                return (
+                  <button
+                    key={option}
+                    autoFocus={index === 0}
+                    onClick={() => onRespond(request, { value: option })}
+                    style={{
+                      width: "100%",
+                      padding: "9px 10px",
+                      borderRadius: 7,
+                      border: "1px solid var(--border)",
+                      background: "var(--bg-panel)",
+                      color: "var(--text)",
+                      cursor: "pointer",
+                      textAlign: "left",
+                      fontSize: 13,
+                      overflowWrap: "anywhere",
+                    }}
+                  >
+                    {structured ? (
+                      <>
+                        <div style={{ fontSize: 13, fontWeight: 600, overflowWrap: "anywhere" }}>{structured.label}</div>
+                        <div style={{ fontSize: 12, lineHeight: 1.5, color: "var(--text-muted)", marginTop: 2, overflowWrap: "anywhere" }}>{structured.description}</div>
+                      </>
+                    ) : option}
+                  </button>
+                );
+              })}
             </div>
           )}
           {request.method === "input" && (
