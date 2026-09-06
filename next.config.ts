@@ -21,6 +21,7 @@ const nextConfig: NextConfig = {
   // loads in a Turbopack worker where those signals are absent or polluted.
   distDir: process.env.PI_WEB_DEV ? ".next-dev" : ".next",
   serverExternalPackages: [
+    "node-pty",
     "undici",
     "web-push",
     "@earendil-works/pi-coding-agent",
