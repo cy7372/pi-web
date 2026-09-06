@@ -313,6 +313,11 @@ export class AgentSessionWrapper {
     return this.suppressCompletionNotifications;
   }
 
+  /** True while the agent is blocked on at least one extension ui_request (e.g. ask_user_question) awaiting the user. */
+  hasPendingUiRequests(): boolean {
+    return this.pendingUiRequests.size > 0;
+  }
+
   start(): void {
     this.unsubscribe = this.inner.subscribe((event: AgentEvent) => {
       if (event.type === "agent_start") this.agentRunNeedsCompletion = true;
@@ -511,6 +516,9 @@ export class AgentSessionWrapper {
     // Pi normally delays the first flush until an assistant message exists.
     // A leading shell command has no assistant message, so mark this SDK
     // manager as flushed after writing its own generated entries.
+    // SAFETY: `flushed` is an internal SDK SessionManager field (no public API);
+    // the key matches the installed SDK's implementation and only this
+    // initialization path writes it, before any SDK flush can race.
     (manager as unknown as { flushed: boolean }).flushed = true;
     cacheSessionPath(this.inner.sessionId, sessionFile);
   }
@@ -1550,6 +1558,9 @@ export class AgentSessionWrapper {
       setWidget: (key, content, options) => {
         if (!this._alive || this.extensionWidgetsResetting) return;
         if (typeof content === "function") {
+          // SAFETY: the SDK's setWidget `content` union has already narrowed to
+          // a function here; its signature is structurally the widget factory
+          // setExtensionWidgetFactory expects (verified against the SDK types).
           this.setExtensionWidgetFactory(
             key,
             content as unknown as ExtensionWidgetFactory,
@@ -1773,7 +1784,12 @@ export async function setRpcSessionTools(
   if (!existing?.isAlive()) {
     if (!sessionFile) throw new Error("Session not found");
     const manager = SessionManager.open(sessionFile, undefined);
-    if (readSubagentSessionResources(manager.getEntries() as unknown as SessionEntry[])) {
+    if (
+      readSubagentSessionResources(
+        // SAFETY: SDK getEntries() entries structurally mirror lib/pi-types SessionEntry[]; the double assertion only bridges the SDK generic.
+        manager.getEntries() as unknown as SessionEntry[],
+      )
+    ) {
       throw new Error("Subagent tool selection is fixed by its profile");
     }
     appendSessionToolSelection(manager, toolNames);
@@ -1783,7 +1799,12 @@ export async function setRpcSessionTools(
   }
 
   if (existing.isRunning()) throw new Error("Cannot change tools while the session is running");
-  if (readSubagentSessionResources(existing.inner.sessionManager.getEntries() as unknown as SessionEntry[])) {
+  if (
+    readSubagentSessionResources(
+      // SAFETY: same structural mirror — SDK entries vs lib/pi-types SessionEntry[].
+      existing.inner.sessionManager.getEntries() as unknown as SessionEntry[],
+    )
+  ) {
     throw new Error("Subagent tool selection is fixed by its profile");
   }
 
@@ -1852,6 +1873,8 @@ export function getRpcSessionInfos(): SessionInfo[] {
 
     const manager = session.inner.sessionManager;
     const header = manager.getHeader();
+    // SAFETY: structural mirror — SDK entry shapes vs the local loose entry /
+    // SessionMessageEntry unions; only .type / .timestamp / .message are read.
     const entries = manager.getEntries() as unknown as Array<
       { type: string; timestamp: string } | SessionMessageEntry
     >;
@@ -1859,6 +1882,7 @@ export function getRpcSessionInfos(): SessionInfo[] {
     const firstUserMessage = messages.find((entry) => entry.message.role === "user");
     const sessionFile = manager.getSessionFile() ?? session.sessionFile;
     const persisted = Boolean(sessionFile && existsSync(sessionFile));
+    // SAFETY: same structural mirror — see the entries assertion above.
     const subagent = readSubagentRun(entries as unknown as SessionEntry[], header?.id ?? session.sessionId, sessionFile ?? "");
 
     // An ensure_session call creates an idle, empty runtime while the composer
@@ -1935,6 +1959,17 @@ export function getCompletionNotificationSuppressedRpcSessionIds(): string[] {
   return [...ids];
 }
 
+/** Sessions whose agent is blocked on an extension ui_request (e.g. ask_user_question) awaiting user input. */
+export function getAwaitingInputRpcSessionIds(): string[] {
+  const ids = new Set<string>();
+  for (const [sessionId, session] of getRegistry()) {
+    if (session.isRunning() && session.hasPendingUiRequests()) {
+      ids.add(session.sessionId || sessionId);
+    }
+  }
+  return [...ids];
+}
+
 /**
  * Get or create an AgentSession for the given session.
  * For new sessions (sessionFile === ""), pi generates its own id.
@@ -1971,12 +2006,16 @@ export async function startRpcSession(
   const sessionCwd = sessionManager.getCwd();
   const subagentResources = sessionFile
     ? readSubagentSessionResources(
+        // SAFETY: structural mirror — SDK entries vs lib/pi-types SessionEntry[].
         sessionManager.getEntries() as unknown as SessionEntry[],
       )
     : null;
   const persistedToolNames = subagentResources
     ? undefined
-    : readSessionToolSelection(sessionManager.getEntries() as unknown as SessionEntry[]);
+    : readSessionToolSelection(
+        // SAFETY: same structural mirror as above.
+        sessionManager.getEntries() as unknown as SessionEntry[],
+      );
   const selectedToolNames = subagentResources?.tools ?? persistedToolNames ?? requestedToolNames;
   if (!subagentResources && persistedToolNames === undefined && requestedToolNames !== undefined) {
     appendSessionToolSelection(sessionManager, requestedToolNames);
