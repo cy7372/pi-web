@@ -22,9 +22,14 @@ echo [deploy] 2/3 production build ...
 if errorlevel 1 goto :fail
 
 echo [deploy] 3/3 restart PiWeb service ...
-servy-cli restart --name=PiWeb
+REM 2026-09-06: MUST be sudo. A non-elevated `servy-cli restart` can
+REM complete the STOP but silently fail the START (event log shows stop at
+REM 12:54:03, start never attempted) - service left Stopped while deploy
+REM reports done, and the old node child lingers as an orphan holding no
+RE listener. sudo makes stop+start atomic from any console.
+sudo servy-cli restart --name=PiWeb
 if errorlevel 1 (
-    echo [deploy] servy-cli needs elevation. Run:  sudo servy-cli restart --name=PiWeb
+    echo [deploy] sudo servy-cli restart failed. Finish manually:  sudo servy-cli start --name=PiWeb
     exit /b 1
 )
 
