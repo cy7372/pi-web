@@ -296,6 +296,7 @@ export const zhCNLocale: LocalePlugin = {
     "chat.loadEarlier": "向上滚动以加载更早的消息",
     "chat.extensionRequest": "扩展请求",
     "chat.extensionExpiresIn": "{seconds} 秒后过期",
+    "chat.extensionNumberHint": "按 1-{count} 快速选择",
     "chat.extensionPending": "待回答",
     "chat.extensionCollapse": "收起",
     "chat.extensionExpand": "展开",

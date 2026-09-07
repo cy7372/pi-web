@@ -296,6 +296,7 @@ export const zhTWLocale: LocalePlugin = {
     "chat.loadEarlier": "向上捲動以載入較早的訊息",
     "chat.extensionRequest": "擴充功能請求",
     "chat.extensionExpiresIn": "{seconds} 秒後過期",
+    "chat.extensionNumberHint": "按 1-{count} 快速選擇",
     "chat.extensionPending": "待回答",
     "chat.extensionCollapse": "收起",
     "chat.extensionExpand": "展開",

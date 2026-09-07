@@ -1479,33 +1479,55 @@ type ExtensionDialogRequest = Extract<ExtensionUiRequest, { method: "select" | "
  * The response value always echoes the original option string, so presentation
  * changes cannot break the dialog protocol.
  */
-function parseStructuredOption(option: string): { label: string; description: string } | null {
+function parseStructuredOption(option: string): { label: string; description: string; recommended: boolean } | null {
   const m = /^(\d+)\.\s+(.+?)\s+—\s+(.+)$/.exec(option);
-  return m ? { label: m[2], description: m[3] } : null;
+  if (!m) return null;
+  // ask_user_question's convention: a recommended option carries a literal
+  // "(Recommended)" suffix on its label; strip it and flag it for a badge.
+  const recommended = /\s*\((?:Recommended|推荐|推薦)\)\s*$/.test(m[2]);
+  return {
+    label: m[2].replace(/\s*\((?:Recommended|推荐|推薦)\)\s*$/, ""),
+    description: m[3],
+    recommended,
+  };
 }
 
-/** Split a dialog title into heading (first line), prose (remaining plain lines) and preview markdown (--- N. … preview --- blocks). */
-function splitDialogTitle(title: string): { heading: string; prose: string; preview: string } {
+/** Split a dialog title into heading (first line), prose (remaining plain lines) and per-option preview markdown keyed by option number. */
+function splitDialogTitle(title: string): { heading: string; prose: string; previews: Map<number, string> } {
   const lines = title.split("\n");
   let previewFrom = -1;
   for (let i = 0; i < lines.length; i++) {
-    if (/^---\s.+\spreview\s---\s*$/.test(lines[i])) {
+    if (/^---\s.+?\spreview\s---\s*$/.test(lines[i])) {
       previewFrom = i;
       break;
     }
   }
   const headingSource = (previewFrom === -1 ? title : lines.slice(0, previewFrom).join("\n")).trimEnd();
-  // `--- N. label preview ---` separators are not valid markdown (a thematic
-  // break line may not contain other text), so they would render as opaque
-  // paragraph noise — rewrite them into bold section headings.
-  const preview = previewFrom === -1
-    ? ""
-    : lines.slice(previewFrom).join("\n").trim().replace(/^---\s(.+?)\spreview\s---\s*$/gm, "**$1 preview**");
   const firstNl = headingSource.indexOf("\n");
+  const previews = new Map<number, string>();
+  if (previewFrom !== -1) {
+    // rpc-fallback folds each option's preview as `--- N. label preview ---`
+    // followed by the markdown body, up to the next separator or EOF.
+    let current: number | null = null;
+    const chunks = new Map<number, string[]>();
+    for (let i = previewFrom; i < lines.length; i++) {
+      const sep = /^---\s+(\d+)\..+?\spreview\s---\s*$/.exec(lines[i]);
+      if (sep) {
+        current = Number(sep[1]);
+        if (!chunks.has(current)) chunks.set(current, []);
+        continue;
+      }
+      if (current !== null) chunks.get(current)!.push(lines[i]);
+    }
+    for (const [num, chunk] of chunks) {
+      const body = chunk.join("\n").trim();
+      if (body) previews.set(num, body);
+    }
+  }
   return {
     heading: firstNl === -1 ? headingSource : headingSource.slice(0, firstNl),
     prose: firstNl === -1 ? "" : headingSource.slice(firstNl + 1).trim(),
-    preview,
+    previews,
   };
 }
 
@@ -1558,13 +1580,30 @@ function ExtensionDialog({
     }
   };
 
+  // Number-key quick select (TUI habit): pressing 1-9 in a select dialog
+  // submits that option immediately. Safe here because select dialogs hold
+  // no text input — the only keys typed are navigational.
+  const handleNumberKey = (event: React.KeyboardEvent) => {
+    if (request.method !== "select" || event.nativeEvent.isComposing) return;
+    if (!/^[1-9]$/.test(event.key)) return;
+    const index = Number(event.key) - 1;
+    if (index >= request.options.length) return;
+    event.preventDefault();
+    event.stopPropagation();
+    onRespond(request, { value: request.options[index] });
+  };
+
   return (
     <div
       onKeyDown={(event) => {
-        if (event.key !== "Escape" || event.nativeEvent.isComposing) return;
-        event.preventDefault();
-        event.stopPropagation();
-        onRespond(request, { cancelled: true });
+        if (event.nativeEvent.isComposing) return;
+        if (event.key === "Escape") {
+          event.preventDefault();
+          event.stopPropagation();
+          onRespond(request, { cancelled: true });
+          return;
+        }
+        handleNumberKey(event);
       }}
       style={{
         position: "absolute",
@@ -1621,7 +1660,7 @@ function ExtensionDialog({
         aria-label={request.title}
         style={{
           pointerEvents: "auto",
-          width: "min(560px, 100%)",
+          width: "min(720px, 100%)",
           maxHeight: "min(760px, 100%)",
           display: "flex",
           flexDirection: "column",
@@ -1640,6 +1679,9 @@ function ExtensionDialog({
             )}
             <div style={{ display: "flex", flexWrap: "wrap", gap: 8, marginTop: 3, color: "var(--text-dim)", fontSize: 11, fontFamily: "var(--font-mono)" }}>
               <span>{t("chat.extensionRequest")}</span>
+              {request.method === "select" && request.options.length > 0 && (
+                <span>{t("chat.extensionNumberHint", { count: request.options.length })}</span>
+              )}
               {countdown}
             </div>
           </div>
@@ -1677,11 +1719,6 @@ function ExtensionDialog({
           {request.method === "confirm" && (
             <div style={{ color: "var(--text-muted)", fontSize: 13, lineHeight: 1.6, whiteSpace: "pre-wrap" }}>{request.message}</div>
           )}
-          {request.method === "select" && dialogParts.preview && (
-            <div style={{ marginBottom: 12, padding: "8px 12px", borderRadius: 7, border: "1px solid var(--border)", background: "var(--bg-panel)", maxHeight: 280, overflowY: "auto" }}>
-              <MarkdownBody>{dialogParts.preview}</MarkdownBody>
-            </div>
-          )}
           {request.method === "select" && (
             <div
               onKeyDown={(event) => {
@@ -1696,34 +1733,70 @@ function ExtensionDialog({
                 buttons[next].focus({ preventScroll: true });
                 buttons[next].scrollIntoView({ block: "nearest" });
               }}
-              style={{ display: "grid", gap: 8 }}
+              style={{ display: "grid", gap: 6 }}
             >
               {request.options.map((option, index) => {
                 const structured = parseStructuredOption(option);
+                const preview = dialogParts.previews.get(index + 1);
                 return (
                   <button
                     key={option}
+                    type="button"
+                    className="ask-option"
                     autoFocus={index === 0}
                     onClick={() => onRespond(request, { value: option })}
+                    title={structured ? `${structured.label}${structured.description ? ` — ${structured.description}` : ""}` : option}
                     style={{
                       width: "100%",
-                      padding: "9px 10px",
+                      padding: "7px 10px",
                       borderRadius: 7,
                       border: "1px solid var(--border)",
                       background: "var(--bg-panel)",
                       color: "var(--text)",
                       cursor: "pointer",
                       textAlign: "left",
-                      fontSize: 13,
-                      overflowWrap: "anywhere",
+                      fontSize: 14,
                     }}
                   >
-                    {structured ? (
-                      <>
-                        <div style={{ fontSize: 13, fontWeight: 600, overflowWrap: "anywhere" }}>{structured.label}</div>
-                        <div style={{ fontSize: 12, lineHeight: 1.5, color: "var(--text-muted)", marginTop: 2, overflowWrap: "anywhere" }}>{structured.description}</div>
-                      </>
-                    ) : option}
+                    <span style={{ display: "flex", alignItems: "center", gap: 8, minWidth: 0 }}>
+                      <span className="ask-option-badge">{index + 1}</span>
+                      <span
+                        style={{
+                          fontWeight: 600,
+                          whiteSpace: "nowrap",
+                          overflow: "hidden",
+                          textOverflow: "ellipsis",
+                          flex: "0 1 auto",
+                          minWidth: 0,
+                        }}
+                      >
+                        {structured?.label ?? option}
+                      </span>
+                      {structured?.recommended && (
+                        <span style={{ flexShrink: 0, fontSize: 10.5, color: "var(--accent)", fontFamily: "var(--font-mono)" }}>★</span>
+                      )}
+                      {structured?.description && (
+                        <span
+                          style={{
+                            flex: "1 1 40%",
+                            minWidth: 0,
+                            fontSize: 12.5,
+                            lineHeight: 1.4,
+                            color: "var(--text-muted)",
+                            whiteSpace: "nowrap",
+                            overflow: "hidden",
+                            textOverflow: "ellipsis",
+                          }}
+                        >
+                          · {structured.description}
+                        </span>
+                      )}
+                    </span>
+                    {preview && (
+                      <span className="ask-option-preview">
+                        <MarkdownBody>{preview}</MarkdownBody>
+                      </span>
+                    )}
                   </button>
                 );
               })}
