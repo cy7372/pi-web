@@ -315,7 +315,14 @@ export class AgentSessionWrapper {
 
   /** True while the agent is blocked on at least one extension ui_request (e.g. ask_user_question) awaiting the user. */
   hasPendingUiRequests(): boolean {
-    return this.pendingUiRequests.size > 0;
+    // TUI footer-style custom UI panels are passive status displays
+    // (compact-cache's cache stats, …) pinned in the map until the extension
+    // closes them — they are not input requests and must not flip the
+    // awaiting-input indicator.
+    for (const event of this.pendingUiRequests.values()) {
+      if (!("method" in event) || (event as ExtensionUiRequest).method !== "custom") return true;
+    }
+    return false;
   }
 
   start(): void {

@@ -1912,7 +1912,11 @@ function ExtensionCustomPanel({
   const { t } = useI18n();
   const inputRef = useRef<HTMLTextAreaElement>(null);
   const composingRef = useRef(false);
-  const [collapsed, setCollapsed] = useState(false);
+  // Default to the collapsed pill: pi TUI custom UI is overwhelmingly
+  // passive footer/status displays (e.g. compact-cache's cache stats), so
+  // opening a 920px modal by default would block the chat for decoration.
+  // Interactive panels can still be expanded by clicking the pill.
+  const [collapsed, setCollapsed] = useState(true);
   const displayLines = normalizeCustomPanelLines(request.lines);
   const summary = displayLines.find((line) => line.trim())?.trim();
 
