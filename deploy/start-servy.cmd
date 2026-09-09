@@ -30,5 +30,15 @@ REM /api/sessions was always empty (No session found).
 REM Point it at the real user profile: web and CLI share one store.
 set "USERPROFILE=C:\Users\CyYu"
 set "HOME=C:\Users\CyYu"
-"C:\Users\CyYu\AppData\Local\nvm\v22.20.0\bun.exe" run start
+REM 2026-09-09 RULE: never point at a versioned nvm path
+REM  (nvm\v22.20.0\bun.exe vanished with the nvm upgrade -> child
+REM  exit -> 5x restart exhausted -> service STOPPED -> 502).
+REM  bun.exe is self-contained; pinned at D:\Programs\bun\bun.exe,
+REM  decoupled from nvm. Update that copy manually when upgrading bun.
+set "BUN_EXE=D:\Programs\bun\bun.exe"
+if not exist "%BUN_EXE%" (
+    >&2 echo [PiWeb] FATAL: bun.exe missing at %BUN_EXE%. Restore from nvm\*\node_modules\bun\bin\bun.exe.
+    exit /b 1
+)
+"%BUN_EXE%" run start
 endlocal & exit /b %errorlevel%

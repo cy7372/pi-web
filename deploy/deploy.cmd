@@ -11,7 +11,9 @@ REM  otherwise finish manually:  sudo servy-cli restart --name=PiWeb
 REM ============================================================
 setlocal
 cd /d "D:\Programs\pi-web"
-set "BUN=C:\Users\CyYu\AppData\Local\nvm\v22.20.0\bun.exe"
+REM 2026-09-09: pinned standalone bun, decoupled from nvm upgrades
+REM  (versioned nvm path died on 09-09 -> service restart loop -> 502).
+set "BUN=D:\Programs\bun\bun.exe"
 
 echo [deploy] 1/3 bun install ...
 "%BUN%" install
