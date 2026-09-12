@@ -343,6 +343,8 @@ function UserMessageView({ message, cwd, onOpenFile, entryId, onFork, forking, o
       {imageBlocks.map((img, i) => {
         // lib/types.ts ImageContent uses {source:{type,data,media_type,url}}
         // pi-ai on-disk format uses flat {data, mimeType} — handle both
+        // SAFETY: legacy pi-ai image blocks stored the fields flat; the cast
+        // only reads optional fields and falls through to "" when absent.
         const flat = img as unknown as { data?: string; mimeType?: string };
         const src = img.source
           ? img.source.type === "base64"
@@ -1711,6 +1713,8 @@ function getMessageImages(content: CustomMessage["content"] | UserMessage["conte
 }
 
 function imageSource(img: ImageContent): string {
+  // SAFETY: legacy pi-ai image blocks stored the fields flat; the cast only
+  // reads optional fields and the expression falls back to "" when absent.
   const flat = img as unknown as { data?: string; mimeType?: string };
   if (img.source) {
     return img.source.type === "base64"

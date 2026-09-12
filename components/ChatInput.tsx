@@ -328,6 +328,8 @@ export function getUserMessageDraftImages(message: UserMessage): ChatDraftImage[
     if (block.type !== "image") return [];
 
     // Support both the current nested image format and older flat pi-ai entries.
+    // SAFETY: legacy pi-ai entries stored images flat ({data, mimeType}); the
+    // cast only reads optional fields and every value is type-checked below.
     const flat = block as unknown as { data?: unknown; mimeType?: unknown };
     const data = block.source?.type === "base64" ? block.source.data : flat.data;
     const mimeType = block.source?.type === "base64" ? block.source.media_type : flat.mimeType;
