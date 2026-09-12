@@ -378,6 +378,7 @@ export const zhTWLocale: LocalePlugin = {
     "chat.stopCompaction": "停止壓縮",
     "chat.compactContext": "壓縮上下文",
     "chat.compacting": "正在壓縮…",
+    "chat.compactingQueued": "正在壓縮上下文，{count} 條訊息將在壓縮後自動發送",
     "chat.compact": "壓縮",
     "chat.stopAgent": "停止 Agent",
     "chat.stop": "停止",

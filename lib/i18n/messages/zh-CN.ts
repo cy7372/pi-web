@@ -378,6 +378,7 @@ export const zhCNLocale: LocalePlugin = {
     "chat.stopCompaction": "停止压缩",
     "chat.compactContext": "压缩上下文",
     "chat.compacting": "正在压缩…",
+    "chat.compactingQueued": "正在压缩上下文，{count} 条消息将在压缩后自动发送",
     "chat.compact": "压缩",
     "chat.stopAgent": "停止 Agent",
     "chat.stop": "停止",

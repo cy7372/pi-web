@@ -2,8 +2,8 @@
 import { registerAbortHandler } from "@/hooks/useKeyboardShortcuts";
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { createPortal } from "react-dom";
-import type { AgentMessage, AssistantContentBlock, AssistantMessage, BashExecutionMessage, BlockingExtensionUiRequest, ExtensionUiRequest, SessionInfo, SessionTreeNode, ToolResultMessage, UserMessage } from "@/lib/types";
-import { normalizeCustomPanelLines } from "@/lib/ansi";
+import type { AgentMessage, AssistantContentBlock, AssistantMessage, BashExecutionMessage, BlockingExtensionUiRequest, ExtensionUiAction, ExtensionUiRequest, SessionInfo, SessionTreeNode, ToolResultMessage, UserMessage } from "@/lib/types";
+import { normalizeCustomPanelLinesMapped } from "@/lib/ansi";
 import { asBracketedPaste, toTerminalKeyData } from "@/lib/terminal-input";
 import { countToolCallBlocks, getAssistantErrorMessage, getDisplayableAssistantBlocks, isMessageGroupAnchor, splitFinalAssistantBlocks } from "@/lib/message-display";
 import { extractTurnWrittenFiles, type WrittenFile } from "@/lib/turn-written-files";
@@ -1912,15 +1912,21 @@ function ExtensionCustomPanel({
   const { t } = useI18n();
   const inputRef = useRef<HTMLTextAreaElement>(null);
   const composingRef = useRef(false);
-  // Default to the collapsed pill: pi TUI custom UI is overwhelmingly
-  // passive footer/status displays (e.g. compact-cache's cache stats), so
-  // opening a 920px modal by default would block the chat for decoration.
-  // Interactive panels can still be expanded by clicking the pill.
-  // Panels that declare touch actions (ask_user questionnaires) are
-  // interactive by definition — auto-expand so mobile users see the buttons.
-  const [collapsed, setCollapsed] = useState(() => !request.actions?.length);
-  const displayLines = normalizeCustomPanelLines(request.lines);
+  // Default to the collapsed pill for passive overlays (toasts, footer status
+  // displays) — opening a 920px modal for decoration would block the chat.
+  // Interactive dialogs expand by default: those marked overlayOptions.awaiting
+  // (ask_user_question) or declaring touch actions (mobile buttons).
+  const [collapsed, setCollapsed] = useState(() => !(request.awaiting || request.actions?.length));
+  const { lines: displayLines, indexMap } = normalizeCustomPanelLinesMapped(request.lines);
   const summary = displayLines.find((line) => line.trim())?.trim();
+  // 触控行点按：带行号的动作映射到显示行（去框线/裁空行后换算）；无行号退回底部按钮
+  const rowActionByDisplay = new Map<number, ExtensionUiAction>();
+  const barActions: ExtensionUiAction[] = [];
+  for (const action of request.actions ?? []) {
+    const display = action.row === undefined ? -1 : indexMap.indexOf(action.row);
+    if (display >= 0) rowActionByDisplay.set(display, action);
+    else barActions.push(action);
+  }
 
   useEffect(() => {
     if (!collapsed) inputRef.current?.focus();
@@ -2087,7 +2093,7 @@ function ExtensionCustomPanel({
             </button>
           </div>
         </div>
-        <pre
+        <div
           style={{
             margin: 0,
             padding: 14,
@@ -2098,12 +2104,43 @@ function ExtensionCustomPanel({
             fontFamily: "var(--font-mono)",
             fontSize: 13,
             lineHeight: 1.45,
-            whiteSpace: "pre",
           }}
         >
-          <AnsiText text={displayLines.join("\n")} />
-        </pre>
-        {request.actions?.length ? (
+          <style>{[
+            ".ext-tap-row{cursor:pointer;touch-action:manipulation;-webkit-tap-highlight-color:transparent;user-select:none}",
+            ".ext-tap-row:hover{background:rgba(96,165,250,.12)}",
+            ".ext-tap-row:active{background:rgba(96,165,250,.22)}",
+          ].join("")}</style>
+          {displayLines.map((line, i) => {
+            const action = rowActionByDisplay.get(i);
+            const content = line.length === 0 ? "\u00A0" : line;
+            if (!action) {
+              return (
+                <div key={i} style={{ whiteSpace: "pre" }}>
+                  <AnsiText text={content} />
+                </div>
+              );
+            }
+            return (
+              <div
+                key={i}
+                className="ext-tap-row"
+                role="button"
+                aria-label={action.label}
+                title={action.label}
+                onClick={() => {
+                  onInput(request, action.data);
+                  // 自定义答案：进入编辑后马上要打字，焦点回到输入捕获层
+                  if (action.kind === "custom") inputRef.current?.focus();
+                }}
+                style={{ whiteSpace: "pre", borderRadius: 4, margin: "0 -14px", padding: "0 14px" }}
+              >
+                <AnsiText text={content} />
+              </div>
+            );
+          })}
+        </div>
+        {barActions.length ? (
           <div
             style={{
               flexShrink: 0,
@@ -2115,7 +2152,7 @@ function ExtensionCustomPanel({
               background: "var(--bg)",
             }}
           >
-            {request.actions.map((action) => (
+            {barActions.map((action) => (
               <button
                 key={`${action.kind ?? "action"}:${action.label}:${action.data}`}
                 type="button"

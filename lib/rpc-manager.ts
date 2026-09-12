@@ -71,13 +71,14 @@ type CustomUiComponent = {
   handleInput?: (data: string) => void;
   dispose?: () => void;
   invalidate?: () => void;
-  /** 交互面声明（可选能力）：当前可点按动作，随渲染重算；网页端渲染成触控按钮。 */
+  /** 交互面声明（可选能力）：当前可点按动作，随渲染重算；row=输出行号→网页端直接点行。 */
   getActions?: () => Array<{
     label: string;
     data: string;
     kind?: "option" | "custom" | "submit" | "tab";
     checked?: boolean;
     active?: boolean;
+    row?: number;
   }>;
 };
 
@@ -100,6 +101,8 @@ type ActiveExtensionWidget = {
 type ActiveCustomUi = {
   component: CustomUiComponent;
   width: number;
+  /** Interactive dialog marker (overlayOptions.awaiting) — awaiting-input indicator + auto-expanded browser panel. */
+  awaiting: boolean;
   resolve: (value: unknown) => void;
   settled: boolean;
 };
@@ -255,6 +258,12 @@ export class AgentSessionWrapper {
   private extensionWidgetGenerations = new Map<string, number>();
   private extensionWidgetsResetting = false;
   private pendingPromptCount = 0;
+  /** Prompts parked while compaction runs. The SDK rejects prompt submissions
+   *  during compaction ("Cannot submit a prompt while compaction is in
+   *  progress"); park server-side instead and flush FIFO on compaction_end so
+   *  messages queue (visible via queuedMessages) rather than erroring. */
+  private parkedPrompts: Array<Record<string, unknown>> = [];
+  private parkedFlushScheduled = false;
   private activeMutatingCommands = 0;
   private sessionReplacement: "fork" | "clone" | null = null;
   private agentRunNeedsCompletion = false;
@@ -311,7 +320,7 @@ export class AgentSessionWrapper {
   }
 
   isRunning(): boolean {
-    return this._alive && (this.pendingPromptCount > 0 || this.inner.isStreaming || this.inner.isCompacting || this.inner.isBashRunning);
+    return this._alive && (this.pendingPromptCount > 0 || this.inner.isStreaming || this.inner.isCompacting || this.inner.isBashRunning || this.parkedPrompts.length > 0);
   }
 
   isChatOnly(): boolean {
@@ -324,12 +333,16 @@ export class AgentSessionWrapper {
 
   /** True while the agent is blocked on at least one extension ui_request (e.g. ask_user_question) awaiting the user. */
   hasPendingUiRequests(): boolean {
-    // TUI footer-style custom UI panels are passive status displays
-    // (compact-cache's cache stats, …) pinned in the map until the extension
+    // Passive custom UI panels (toast notifications, footer status displays
+    // like compact-cache stats) stay pinned in the map until the extension
     // closes them — they are not input requests and must not flip the
-    // awaiting-input indicator.
+    // awaiting-input indicator. Interactive dialogs (ask_user_question) opt in
+    // via overlayOptions.awaiting and DO count.
     for (const event of this.pendingUiRequests.values()) {
-      if (!("method" in event) || (event as ExtensionUiRequest).method !== "custom") return true;
+      if (!("method" in event)) return true;
+      const request = event as ExtensionUiRequest;
+      if (request.method !== "custom") return true;
+      if ((request as { awaiting?: boolean }).awaiting === true) return true;
     }
     return false;
   }
@@ -341,10 +354,78 @@ export class AgentSessionWrapper {
         invalidateSessionListCache();
       }
       if (IDLE_RESET_EVENT_TYPES.has(event.type)) this.resetIdleTimer();
+      if ((event.type === "compaction_end" || event.type === "auto_compaction_end") && this.parkedPrompts.length > 0) {
+        this.flushParkedPrompts();
+        // The SDK's own queue_update snapshot does not know about parked
+        // prompts; keep rendering them until the flush actually submits.
+        this.emitParkedQueueUpdate();
+        return;
+      }
+      if (event.type === "queue_update" && this.parkedPrompts.length > 0) {
+        this.emit({
+          ...event,
+          followUp: [
+            ...((event.followUp as string[] | undefined) ?? []),
+            ...this.parkedPrompts.map((parked) => String(parked.message ?? "")),
+          ],
+        });
+        return;
+      }
       this.emit(event);
       if (event.type === "agent_settled") this.notifyAgentRunCompleteIfIdle();
     });
     this.resetIdleTimer();
+  }
+
+  /** Emit a queue_update that merges parked prompts into the followUp list. */
+  private emitParkedQueueUpdate(): void {
+    this.emit({
+      type: "queue_update",
+      steering: [...this.inner.getSteeringMessages()],
+      followUp: [
+        ...this.inner.getFollowUpMessages(),
+        ...this.parkedPrompts.map((parked) => String(parked.message ?? "")),
+      ],
+    });
+  }
+
+  /** Submit parked prompts FIFO once compaction has finished. Re-dispatches
+   *  through send() so admission serialization, run bookkeeping, and error
+   *  surfacing reuse the normal path. */
+  private flushParkedPrompts(): void {
+    if (this.parkedFlushScheduled || this.parkedPrompts.length === 0) return;
+    this.parkedFlushScheduled = true;
+    void (async () => {
+      try {
+        while (this._alive && this.parkedPrompts.length > 0) {
+          // A new compaction started while flushing — its compaction_end will re-schedule.
+          if (this.inner.isCompacting) return;
+          const parked = this.parkedPrompts.shift()!;
+          try {
+            if (this.inner.isStreaming && parked.streamingBehavior === undefined) {
+              // Auto-compaction ended back into a live run: join its queue
+              // instead of starting an illegal parallel prompt.
+              await this.send({ ...parked, streamingBehavior: "followUp" });
+            } else {
+              await this.send(parked);
+            }
+          } catch (error) {
+            console.error("[pi-web] parked prompt flush failed:", error instanceof Error ? error.message : String(error));
+            this.emit({
+              type: "extension_error",
+              extensionPath: "parked-prompt-flush",
+              event: "prompt",
+              error: error instanceof Error ? error.message : String(error),
+            });
+          }
+        }
+      } finally {
+        this.parkedFlushScheduled = false;
+        if (this._alive && this.parkedPrompts.length > 0 && !this.inner.isCompacting) {
+          this.flushParkedPrompts();
+        }
+      }
+    })();
   }
 
   private notifyAgentRunCompleteIfIdle(): void {
@@ -607,6 +688,15 @@ export class AgentSessionWrapper {
       if (type === "prompt" || type === "steer" || type === "follow_up") {
         const imageError = validateAgentImages(command.images);
         if (imageError) throw new Error(imageError);
+        // steer/follow_up queue natively in the SDK even during compaction;
+        // only prompt is rejected — park it and flush on compaction_end.
+        // A prompt parked here keeps the wrapper "running" (isRunning) so it
+        // cannot be idle-reaped before the flush submits it.
+        if (type === "prompt" && this.inner.isCompacting) {
+          this.parkedPrompts.push(command);
+          this.emitParkedQueueUpdate();
+          return { parked: true };
+        }
       }
 
       switch (type) {
@@ -733,7 +823,10 @@ export class AgentSessionWrapper {
           pendingMessageCount: this.inner.pendingMessageCount,
           queuedMessages: {
             steering: [...this.inner.getSteeringMessages()],
-            followUp: [...this.inner.getFollowUpMessages()],
+            followUp: [
+              ...this.inner.getFollowUpMessages(),
+              ...this.parkedPrompts.map((parked) => String(parked.message ?? "")),
+            ],
           },
           contextUsage: contextUsage
             ? { percent: contextUsage.percent, contextWindow: contextUsage.contextWindow, tokens: contextUsage.tokens }
@@ -905,8 +998,18 @@ export class AgentSessionWrapper {
 
       case "clear_queue": {
         // Full clear only: pi has no single-item dequeue, and clear+requeue
-        // races against the agent loop pulling messages mid-flight.
-        return this.inner.clearQueue();
+        // races against the agent loop pulling messages mid-flight. Parked
+        // prompts clear with the same gesture; their texts return so the UI
+        // recall flow can restore them into the composer.
+        const parkedTexts = this.parkedPrompts.map((parked) => String(parked.message ?? ""));
+        this.parkedPrompts = [];
+        const cleared = await this.inner.clearQueue();
+        if (parkedTexts.length === 0) return cleared;
+        const result = (cleared ?? {}) as { steering?: string[]; followUp?: string[] };
+        return {
+          steering: [...(result.steering ?? [])],
+          followUp: [...(result.followUp ?? []), ...parkedTexts],
+        };
       }
 
       case "steer": {
@@ -1330,9 +1433,24 @@ export class AgentSessionWrapper {
     const resolved = typeof overlayOptions === "function" ? overlayOptions() : overlayOptions;
     if (!resolved || typeof resolved !== "object") return DEFAULT_CUSTOM_UI_COLUMNS;
     const width = (resolved as { width?: unknown }).width;
-    return typeof width === "number" && Number.isFinite(width)
-      ? Math.max(40, Math.min(140, Math.round(width)))
-      : 92;
+    if (typeof width === "number" && Number.isFinite(width)) {
+      return Math.max(40, Math.min(140, Math.round(width)));
+    }
+    // Percentage widths (e.g. ask_user_question's "100%") mean "as wide as the
+    // host panel". The browser custom panel is min(920px, 100%) with 13px mono
+    // text (~114 columns) — map "100%" to 110 so wide layouts (ask_user's
+    // side-by-side preview needs ≥100 columns) activate without overflowing.
+    if (width === "100%") return 110;
+    return DEFAULT_CUSTOM_UI_COLUMNS;
+  }
+
+  /** True when the overlay declares itself an interactive blocking dialog (ask_user_question) via overlayOptions.awaiting. */
+  private isAwaitingCustomUi(options: unknown): boolean {
+    if (!options || typeof options !== "object") return false;
+    const overlayOptions = (options as { overlayOptions?: unknown }).overlayOptions;
+    const resolved = typeof overlayOptions === "function" ? overlayOptions() : overlayOptions;
+    return Boolean(resolved) && typeof resolved === "object"
+      && (resolved as { awaiting?: unknown }).awaiting === true;
   }
 
   private emitCustomUiRender(id: string, custom: ActiveCustomUi): void {
@@ -1365,6 +1483,7 @@ export class AgentSessionWrapper {
       method: "custom" as const,
       lines,
       ...(actions ? { actions } : {}),
+      ...(custom.awaiting ? { awaiting: true as const } : {}),
     } as ExtensionUiRequest;
     this.pendingUiRequests.set(id, event);
     this.emit(event);
@@ -1419,6 +1538,7 @@ export class AgentSessionWrapper {
 
     const id = randomUUID();
     const width = this.getCustomUiWidth(options);
+    const awaiting = this.isAwaitingCustomUi(options);
 
     return new Promise<T>((resolve, reject) => {
       let completed = false;
@@ -1464,6 +1584,7 @@ export class AgentSessionWrapper {
           const custom: ActiveCustomUi = {
             component: component as CustomUiComponent,
             width,
+            awaiting,
             resolve: (value) => finish(value as T),
             settled: false,
           };

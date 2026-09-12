@@ -114,7 +114,7 @@ export interface BashExecutionMessage {
 
 export type AgentMessage = UserMessage | AssistantMessage | ToolResultMessage | CustomMessage | BashExecutionMessage;
 
-/** 触控动作（交互面声明）：custom UI 组件可选暴露，网页端渲染成可点按钮。 */
+/** 触控动作（交互面声明）：custom UI 组件可选暴露，网页端渲染成可点控件。 */
 export interface ExtensionUiAction {
   label: string;
   /** 点按后作为终端输入发回组件 handleInput 的字符串。 */
@@ -122,6 +122,8 @@ export interface ExtensionUiAction {
   kind?: "option" | "custom" | "submit" | "tab";
   checked?: boolean;
   active?: boolean;
+  /** 组件渲染输出中的行号（组件自己记录）：有值则网页端把该行直接渲染为可点行，无值则退回底部按钮。 */
+  row?: number;
 }
 
 export type ExtensionUiRequest =

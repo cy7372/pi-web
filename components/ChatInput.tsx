@@ -1500,6 +1500,28 @@ export const ChatInput = forwardRef<ChatInputHandle, Props>(function ChatInput({
             />
           );
         })()}
+        {/* Compaction status — parked/queued messages auto-send when it ends */}
+        {isCompacting && (
+          <div style={{
+            marginBottom: 8, padding: "5px 10px",
+            background: "rgba(14,165,233,0.08)", border: "1px solid rgba(14,165,233,0.25)",
+            borderRadius: 6, fontSize: 12, color: "rgba(2,132,199,0.95)",
+            display: "flex", alignItems: "center", gap: 6,
+          }}>
+            <svg width="11" height="11" viewBox="0 0 24 24" fill="none" aria-hidden="true" style={{ flexShrink: 0, display: "block", color: "currentColor" }}>
+              <g>
+                <path d="M21 12a9 9 0 1 1-3.8-7.4" stroke="currentColor" strokeWidth="2.8" strokeLinecap="round" />
+                <animateTransform attributeName="transform" type="rotate" from="0 12 12" to="360 12 12" dur="0.9s" repeatCount="indefinite" />
+              </g>
+            </svg>
+            {(() => {
+              const queuedCount = (queuedMessages?.steering.length ?? 0) + (queuedMessages?.followUp.length ?? 0);
+              return queuedCount > 0
+                ? t("chat.compactingQueued", { count: queuedCount })
+                : t("chat.compacting");
+            })()}
+          </div>
+        )}
         {/* Queued steering / follow-up messages (delivered by pi on upcoming turns) */}
         {((queuedMessages?.steering.length ?? 0) + (queuedMessages?.followUp.length ?? 0)) > 0 && (
           <div style={{
