@@ -202,6 +202,8 @@ export type ExtensionUiRequest =
       lines: string[];
       /** 组件可选暴露的触控动作（每次渲染后重算）；无则省略。 */
       actions?: ExtensionUiAction[];
+      /** 交互式阻塞对话框（如 ask_user_question）标记：宿主应计入 awaiting-input 状态并默认展开面板；被动 toast/footer 不设此键。 */
+      awaiting?: true;
       closed?: boolean;
     };
 
