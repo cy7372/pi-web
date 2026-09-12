@@ -1916,7 +1916,9 @@ function ExtensionCustomPanel({
   // passive footer/status displays (e.g. compact-cache's cache stats), so
   // opening a 920px modal by default would block the chat for decoration.
   // Interactive panels can still be expanded by clicking the pill.
-  const [collapsed, setCollapsed] = useState(true);
+  // Panels that declare touch actions (ask_user questionnaires) are
+  // interactive by definition — auto-expand so mobile users see the buttons.
+  const [collapsed, setCollapsed] = useState(() => !request.actions?.length);
   const displayLines = normalizeCustomPanelLines(request.lines);
   const summary = displayLines.find((line) => line.trim())?.trim();
 
@@ -2101,6 +2103,58 @@ function ExtensionCustomPanel({
         >
           <AnsiText text={displayLines.join("\n")} />
         </pre>
+        {request.actions?.length ? (
+          <div
+            style={{
+              flexShrink: 0,
+              display: "flex",
+              flexWrap: "wrap",
+              gap: 8,
+              padding: "10px 12px",
+              borderTop: "1px solid var(--border)",
+              background: "var(--bg)",
+            }}
+          >
+            {request.actions.map((action) => (
+              <button
+                key={`${action.kind ?? "action"}:${action.label}:${action.data}`}
+                type="button"
+                onClick={() => {
+                  onInput(request, action.data);
+                  // 自定义答案：进入编辑后马上要打字，焦点回到输入捕获层
+                  if (action.kind === "custom") inputRef.current?.focus();
+                }}
+                style={{
+                  display: "inline-flex",
+                  alignItems: "center",
+                  gap: 6,
+                  minHeight: action.kind === "tab" ? 32 : 40,
+                  padding: action.kind === "tab" ? "4px 10px" : "8px 14px",
+                  borderRadius: 8,
+                  border: `1px solid ${action.checked ? "var(--accent)" : "var(--border)"}`,
+                  background:
+                    action.kind === "submit" ? "var(--accent)" : "var(--bg-panel)",
+                  color: action.kind === "submit" ? "#fff" : "var(--text)",
+                  fontWeight: action.kind === "submit" ? 650 : 400,
+                  fontSize: action.kind === "tab" ? 12 : 13,
+                  cursor: "pointer",
+                  maxWidth: "100%",
+                  overflow: "hidden",
+                  textOverflow: "ellipsis",
+                  whiteSpace: "nowrap",
+                }}
+                title={action.label}
+              >
+                {action.checked ? (
+                  <span aria-hidden style={{ color: "var(--accent)", fontSize: 12, flexShrink: 0 }}>
+                    ✓
+                  </span>
+                ) : null}
+                {action.label}
+              </button>
+            ))}
+          </div>
+        ) : null}
       </div>
       )}
     </div>

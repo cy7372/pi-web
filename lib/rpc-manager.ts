@@ -20,6 +20,7 @@ import { hasActiveSessionLivenessProvider } from "./session-liveness";
 import type { SlashCommandInfo } from "@earendil-works/pi-coding-agent";
 import type { AgentSessionLike, ExtensionUiContextLike, ToolInfo } from "./pi-types";
 import type {
+  ExtensionUiAction,
   ExtensionUiRequest,
   ExtensionUiResponse,
   ExtensionWidgetItem,
@@ -70,6 +71,14 @@ type CustomUiComponent = {
   handleInput?: (data: string) => void;
   dispose?: () => void;
   invalidate?: () => void;
+  /** 交互面声明（可选能力）：当前可点按动作，随渲染重算；网页端渲染成触控按钮。 */
+  getActions?: () => Array<{
+    label: string;
+    data: string;
+    kind?: "option" | "custom" | "submit" | "tab";
+    checked?: boolean;
+    active?: boolean;
+  }>;
 };
 
 type ExtensionWidgetComponent = {
@@ -1333,11 +1342,29 @@ export class AgentSessionWrapper {
     } catch (error) {
       lines = [`Extension custom UI render failed: ${error instanceof Error ? error.message : String(error)}`];
     }
+    // 交互面（可选能力）：组件声明当前可点按动作，网页端渲染成触控按钮，
+    // 点按走 handleExtensionUiInput 同一条输入通道（与键盘归一）。
+    let actions: ExtensionUiAction[] | undefined;
+    try {
+      const declared = custom.component.getActions?.();
+      if (Array.isArray(declared) && declared.length > 0) {
+        actions = declared.filter(
+          (a): a is ExtensionUiAction =>
+            typeof a?.label === "string" &&
+            typeof a?.data === "string" &&
+            a.label !== "" &&
+            a.data !== "",
+        );
+      }
+    } catch {
+      // 交互面是可选能力，失败不影响 ANSI 预览
+    }
     const event = {
-      type: "extension_ui_request",
+      type: "extension_ui_request" as const,
       id,
-      method: "custom",
+      method: "custom" as const,
       lines,
+      ...(actions ? { actions } : {}),
     } as ExtensionUiRequest;
     this.pendingUiRequests.set(id, event);
     this.emit(event);
