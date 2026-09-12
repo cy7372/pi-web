@@ -112,9 +112,8 @@ function readSessionRelationEntries(filePath: string): SessionEntry[] {
 export async function attachSessionProjectInfo(sessions: SessionInfo[]): Promise<SessionInfo[]> {
   const uniqueCwds = [...new Set(sessions.map((s) => s.cwd).filter(Boolean))];
   const projectByCwd = new Map<string, ProjectInfo>();
-  await Promise.all(uniqueCwds.map(async (cwd) => {
-    projectByCwd.set(cwd, await resolveProject(cwd));
-  }));
+  const projects = await Promise.all(uniqueCwds.map((cwd) => resolveProject(cwd)));
+  uniqueCwds.forEach((cwd, index) => projectByCwd.set(cwd, projects[index]));
 
   return sessions.map((session) => {
     const project = session.cwd ? projectByCwd.get(session.cwd) : undefined;
@@ -407,6 +406,9 @@ export function readSessionHeader(filePath: string): SessionHeader | null {
 
 export function getSessionEntries(filePath: string): SessionEntry[] {
   const entries = SessionManager.open(filePath).getEntries();
+  // SAFETY: SDK SessionManager.getEntries() returns the same discriminated-
+  // union entry shapes pi writes to .jsonl files; this only narrows the SDK's
+  // broader type to our local SessionEntry.
   return entries as unknown as SessionEntry[];
 }
 
