@@ -1441,6 +1441,7 @@ export class AgentSessionWrapper {
           0,
           this.activeMutatingCommands - 1,
         );
+      restoreHostCwd(`send(${type})`);
     }
   }
 
@@ -2207,6 +2208,7 @@ declare global {
       >
     | undefined;
   var __piStartingSessionCwds: Map<string, number> | undefined;
+  var __piWebHostCwd: string | undefined;
 }
 
 function getRegistry(): Map<string, AgentSessionWrapper> {
@@ -2225,6 +2227,43 @@ function getRegistry(): Map<string, AgentSessionWrapper> {
     process.once("SIGTERM", shutdown);
   }
   return globalThis.__piSessions;
+}
+
+/**
+ * 2026-09-12 incident defense: pi-web hosts AgentSession in-process inside
+ * the Next.js server, so global extensions that call process.chdir() — e.g.
+ * ~/.pi/agent/extensions/cwd_sync.ts on session_start — hijack the HOST cwd.
+ * Next 16 recomputes relativeProjectDir per request via
+ * path.relative(process.cwd(), projectDir); a cross-drive cwd makes that
+ * return an absolute path which is then join()-ed onto the wrong drive root
+ * (C:\Users\CyYu\.pi\D:\Programs\pi-web\.next\...) → ENOENT → every route
+ * 500s while the process stays RUNNING and static assets still serve.
+ * Extensions should skip chdir when hosted here (detect NEXT_RUNTIME /
+ * __piSessions); this guard is the server-side backstop. The anchor is
+ * captured synchronously at startRpcSession entry — before any extension
+ * code can run — and stored on globalThis because Next bundles route modules
+ * into separate graphs that each get their own copy of this module.
+ */
+function getHostCwd(): string {
+  globalThis.__piWebHostCwd ??= process.cwd();
+  return globalThis.__piWebHostCwd;
+}
+
+function restoreHostCwd(after: string): void {
+  const hostCwd = getHostCwd();
+  const current = process.cwd();
+  if (current === hostCwd) return;
+  try {
+    process.chdir(hostCwd);
+    console.warn(
+      `[rpc-manager] restored host cwd after ${after}; an extension had moved it to ${current}`,
+    );
+  } catch (error) {
+    console.error(
+      `[rpc-manager] failed to restore host cwd after ${after} (currently ${current}):`,
+      error,
+    );
+  }
 }
 
 function registerRpcWrapper(wrapper: AgentSessionWrapper): void {
@@ -2618,6 +2657,10 @@ export async function startRpcSession(
     subagentResources?.loadExtensions || subagentResources?.loadSkills,
   );
   const chatOnly = selectedToolNames?.length === 0 && !subagentLoadsResources;
+  // Capture the host-cwd anchor before any extension code can run (see
+  // restoreHostCwd) — this is the first synchronous point of every session
+  // start, so the cached cwd is always the pristine server cwd.
+  getHostCwd();
   const finishStartingSession = trackStartingSession(sessionCwd);
   const starting = (async () => {
     // Some extensions access the SDK's global theme even outside the terminal UI.
@@ -2800,6 +2843,7 @@ export async function startRpcSession(
 
     return { session: wrapper, realSessionId };
   })().finally(() => {
+    restoreHostCwd("session start");
     locks.delete(sessionId);
     finishStartingSession();
   });
