@@ -6,6 +6,7 @@ import {
   mergeSessionLists,
 } from "@/lib/session-reader";
 import {
+  getAwaitingInputRpcSessionIds,
   getCompletionNotificationSuppressedRpcSessionIds,
   getRpcSessionInfos,
   getRunningRpcSessionIds,
@@ -29,6 +30,10 @@ export async function GET(req: Request) {
         sessions,
         sessionListVersion,
         runningSessionIds: getRunningRpcSessionIds(),
+        // Mobile clients consume this in one shot instead of also polling
+        // /api/agent/running; keeps "awaiting your answer" distinct from
+        // "running" in session lists.
+        awaitingInputSessionIds: getAwaitingInputRpcSessionIds(),
         completionNotificationSuppressedSessionIds: getCompletionNotificationSuppressedRpcSessionIds(),
       },
       { headers: { "Cache-Control": "no-store" } },
