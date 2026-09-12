@@ -7,7 +7,9 @@ export const dynamic = "force-dynamic";
 
 // In-memory registry: loginToken -> resolve/reject for the manualCodeInput promise
 declare global {
-  var __piLoginCallbacks: Map<string, { resolve: (v: string) => void; reject: (e: Error) => void }> | undefined;
+  var __piLoginCallbacks:
+    | Map<string, { resolve: (v: string) => void; reject: (e: Error) => void }>
+    | undefined;
 }
 
 function getCallbackRegistry() {
@@ -18,10 +20,13 @@ function getCallbackRegistry() {
 // POST /api/auth/login/[provider] — frontend sends redirect URL or auth code
 export async function POST(
   req: Request,
-  { params }: { params: Promise<{ provider: string }> }
+  { params }: { params: Promise<{ provider: string }> },
 ) {
   const { provider } = await params;
-  const { token, code } = (await req.json()) as { token?: string; code?: string };
+  const { token, code } = (await req.json()) as {
+    token?: string;
+    code?: string;
+  };
 
   if (!token || !code) {
     return Response.json({ error: "token and code required" }, { status: 400 });
@@ -30,11 +35,17 @@ export async function POST(
   const registry = getCallbackRegistry();
   const callbacks = registry.get(token);
   if (!callbacks) {
-    return Response.json({ error: "No pending login for token" }, { status: 404 });
+    return Response.json(
+      { error: "No pending login for token" },
+      { status: 404 },
+    );
   }
   // Verify token belongs to this provider (token format: "<provider>-<uuid>")
   if (!token.startsWith(`${provider}-`)) {
-    return Response.json({ error: "Token does not match provider" }, { status: 400 });
+    return Response.json(
+      { error: "Token does not match provider" },
+      { status: 400 },
+    );
   }
 
   callbacks.resolve(code);
@@ -45,7 +56,7 @@ export async function POST(
 // GET /api/auth/login/[provider] — SSE stream for OAuth flow
 export async function GET(
   req: Request,
-  { params }: { params: Promise<{ provider: string }> }
+  { params }: { params: Promise<{ provider: string }> },
 ) {
   const { provider } = await params;
 
@@ -62,14 +73,19 @@ export async function GET(
     async start(controller) {
       const modelRuntime = await ModelRuntime.create();
       if (!modelRuntime.getProvider(provider)?.auth.oauth) {
-        send(controller, { type: "error", message: `Unknown provider: ${provider}` });
+        send(controller, {
+          type: "error",
+          message: `Unknown provider: ${provider}`,
+        });
         controller.close();
         return;
       }
 
       const registry = getCallbackRegistry();
       const activeTokens = new Set<string>();
-      let pendingManualRequest: { token: string; promise: Promise<string> } | undefined;
+      let pendingManualRequest:
+        | { token: string; promise: Promise<string> }
+        | undefined;
 
       const createClientInputRequest = () => {
         // Manual-code handshake token; crypto randomness so a pending OAuth
@@ -122,9 +138,10 @@ export async function GET(
       try {
         await modelRuntime.login(provider, "oauth", {
           prompt: async (prompt: AuthPrompt) => {
-            const request = prompt.type === "manual_code"
-              ? getManualInputRequest()
-              : createClientInputRequest();
+            const request =
+              prompt.type === "manual_code"
+                ? getManualInputRequest()
+                : createClientInputRequest();
             if (prompt.type === "select") {
               send(controller, {
                 type: "select_request",

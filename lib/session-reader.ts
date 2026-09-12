@@ -1,16 +1,30 @@
-import {
-  SessionManager,
-  getAgentDir,
-} from "@earendil-works/pi-coding-agent";
+import { SessionManager, getAgentDir } from "@earendil-works/pi-coding-agent";
 import { closeSync, type Dirent, fstatSync, openSync, readSync } from "fs";
 import { readdir } from "fs/promises";
-import { isAbsolute, join, normalize as normalizePath, relative, resolve as resolvePath, sep } from "path";
-import type { AgentMessage, ImageContent, SessionEntry, SessionHeader, SessionInfo, SessionContext } from "./types";
+import {
+  isAbsolute,
+  join,
+  normalize as normalizePath,
+  relative,
+  resolve as resolvePath,
+  sep,
+} from "path";
+import type {
+  AgentMessage,
+  ImageContent,
+  SessionEntry,
+  SessionHeader,
+  SessionInfo,
+  SessionContext,
+} from "./types";
 import { normalizeToolCalls } from "./normalize";
 import { getThinkingPreview } from "./message-display";
 import { projectIdentityKey } from "./project-identity";
 import { sessionPathKey } from "./session-path";
-import { MAX_TOOL_RESULT_IMAGE_BYTES, TOOL_RESULT_IMAGE_MIMES } from "./tool-result-images";
+import {
+  MAX_TOOL_RESULT_IMAGE_BYTES,
+  TOOL_RESULT_IMAGE_MIMES,
+} from "./tool-result-images";
 import { resolveProject, type ProjectInfo } from "./worktree";
 import { readSubagentRun, SUBAGENT_META_TYPE } from "./subagents";
 import { listSessionsIncremental } from "./session-list-scanner";
@@ -22,7 +36,11 @@ const SESSION_RELATION_MAX_BYTES = 256 * 1024;
 const SESSION_RELATION_MAX_LINES = 2;
 const SESSION_RESULT_MAX_BYTES = 256 * 1024;
 
-function readBoundedLines(filePath: string, maxBytes: number, maxLines: number): string[] {
+function readBoundedLines(
+  filePath: string,
+  maxBytes: number,
+  maxLines: number,
+): string[] {
   const fd = openSync(filePath, "r");
   try {
     const chunks: Buffer[] = [];
@@ -55,7 +73,9 @@ function readBoundedLines(filePath: string, maxBytes: number, maxLines: number):
     const lines = source.split("\n");
     if (!reachedEof && !source.endsWith("\n")) lines.pop();
     if (lines.at(-1) === "") lines.pop();
-    return lines.map((line) => line.endsWith("\r") ? line.slice(0, -1) : line);
+    return lines.map((line) =>
+      line.endsWith("\r") ? line.slice(0, -1) : line,
+    );
   } finally {
     closeSync(fd);
   }
@@ -77,7 +97,9 @@ function readBoundedTailLines(filePath: string, maxBytes: number): string[] {
       if (previousByte[0] !== 0x0a) lines.shift();
     }
     if (lines.at(-1) === "") lines.pop();
-    return lines.map((line) => line.endsWith("\r") ? line.slice(0, -1) : line);
+    return lines.map((line) =>
+      line.endsWith("\r") ? line.slice(0, -1) : line,
+    );
   } finally {
     closeSync(fd);
   }
@@ -96,23 +118,34 @@ function parseSessionEntries(lines: readonly string[]): SessionEntry[] {
 
 function readSessionRelationEntries(filePath: string): SessionEntry[] {
   const prefixEntries = parseSessionEntries(
-    readBoundedLines(filePath, SESSION_RELATION_MAX_BYTES, SESSION_RELATION_MAX_LINES).slice(1),
+    readBoundedLines(
+      filePath,
+      SESSION_RELATION_MAX_BYTES,
+      SESSION_RELATION_MAX_LINES,
+    ).slice(1),
   );
-  const isSubagent = prefixEntries.some((entry) => (
-    entry.type === "custom" && entry.customType === SUBAGENT_META_TYPE
-  ));
+  const isSubagent = prefixEntries.some(
+    (entry) =>
+      entry.type === "custom" && entry.customType === SUBAGENT_META_TYPE,
+  );
   if (!isSubagent) return prefixEntries;
 
   return [
     ...prefixEntries,
-    ...parseSessionEntries(readBoundedTailLines(filePath, SESSION_RESULT_MAX_BYTES)),
+    ...parseSessionEntries(
+      readBoundedTailLines(filePath, SESSION_RESULT_MAX_BYTES),
+    ),
   ];
 }
 
-export async function attachSessionProjectInfo(sessions: SessionInfo[]): Promise<SessionInfo[]> {
+export async function attachSessionProjectInfo(
+  sessions: SessionInfo[],
+): Promise<SessionInfo[]> {
   const uniqueCwds = [...new Set(sessions.map((s) => s.cwd).filter(Boolean))];
   const projectByCwd = new Map<string, ProjectInfo>();
-  const projects = await Promise.all(uniqueCwds.map((cwd) => resolveProject(cwd)));
+  const projects = await Promise.all(
+    uniqueCwds.map((cwd) => resolveProject(cwd)),
+  );
   uniqueCwds.forEach((cwd, index) => projectByCwd.set(cwd, projects[index]));
 
   return sessions.map((session) => {
@@ -132,11 +165,15 @@ export function mergeSessionLists(
   persistedSessions: SessionInfo[],
   supplementalSessions: SessionInfo[],
 ): SessionInfo[] {
-  const byId = new Map(supplementalSessions.map((session) => [session.id, session]));
+  const byId = new Map(
+    supplementalSessions.map((session) => [session.id, session]),
+  );
   // A disk scan is authoritative once the JSONL exists. In particular, this
   // replaces a transient registry snapshot without briefly rendering two rows.
   for (const session of persistedSessions) byId.set(session.id, session);
-  return [...byId.values()].sort((a, b) => b.modified.localeCompare(a.modified));
+  return [...byId.values()].sort((a, b) =>
+    b.modified.localeCompare(a.modified),
+  );
 }
 
 async function loadAllSessions(): Promise<SessionInfo[]> {
@@ -146,12 +183,20 @@ async function loadAllSessions(): Promise<SessionInfo[]> {
 
   const sessions = scanned.map((s) => {
     cacheSessionPath(s.id, s.path);
-    const originSessionId = s.parentSessionPath ? pathToId.get(sessionPathKey(s.parentSessionPath)) : undefined;
+    const originSessionId = s.parentSessionPath
+      ? pathToId.get(sessionPathKey(s.parentSessionPath))
+      : undefined;
     let subagent = null;
     if (s.parentSessionPath) {
       try {
-        subagent = readSubagentRun(readSessionRelationEntries(s.path), s.id, s.path);
-      } catch { /* malformed or concurrently removed session */ }
+        subagent = readSubagentRun(
+          readSessionRelationEntries(s.path),
+          s.id,
+          s.path,
+        );
+      } catch {
+        /* malformed or concurrently removed session */
+      }
     }
     return {
       path: s.path,
@@ -164,9 +209,22 @@ async function loadAllSessions(): Promise<SessionInfo[]> {
       firstMessage: s.firstMessage || "(no messages)",
       parentSessionId: originSessionId,
       ...(subagent
-        ? { relation: { kind: "subagent" as const, parentSessionId: subagent.parentSessionId, profile: subagent.profile, description: subagent.description, status: subagent.status } }
+        ? {
+            relation: {
+              kind: "subagent" as const,
+              parentSessionId: subagent.parentSessionId,
+              profile: subagent.profile,
+              description: subagent.description,
+              status: subagent.status,
+            },
+          }
         : s.parentSessionPath
-          ? { relation: { kind: "fork" as const, ...(originSessionId ? { originSessionId } : {}) } }
+          ? {
+              relation: {
+                kind: "fork" as const,
+                ...(originSessionId ? { originSessionId } : {}),
+              },
+            }
           : {}),
       transient: false,
     };
@@ -174,19 +232,27 @@ async function loadAllSessions(): Promise<SessionInfo[]> {
   return attachSessionProjectInfo(sessions);
 }
 
-export async function listAllSessions(options: { force?: boolean } = {}): Promise<SessionInfo[]> {
+export async function listAllSessions(
+  options: { force?: boolean } = {},
+): Promise<SessionInfo[]> {
   if (options.force) invalidateSessionListCache();
   const generation = globalThis.__piSessionListGeneration ?? 0;
 
   // Return cached result if still fresh (avoids re-scanning session files
   // and re-spawning git processes on every page load).
-  if (globalThis.__piSessionListCache && Date.now() - globalThis.__piSessionListCache.ts < SESSION_LIST_CACHE_TTL_MS) {
+  if (
+    globalThis.__piSessionListCache &&
+    Date.now() - globalThis.__piSessionListCache.ts < SESSION_LIST_CACHE_TTL_MS
+  ) {
     return globalThis.__piSessionListCache.data;
   }
 
   // Coalescing dedup: concurrent callers share the same in-flight promise
   // only while it belongs to the current cache generation.
-  if (globalThis.__piSessionListPromise && globalThis.__piSessionListPromiseGeneration === generation) {
+  if (
+    globalThis.__piSessionListPromise &&
+    globalThis.__piSessionListPromiseGeneration === generation
+  ) {
     return globalThis.__piSessionListPromise;
   }
 
@@ -237,10 +303,10 @@ function resolvePathWithinDefaultSessions(
 ): string | null {
   const candidatePath = resolvePath(filePath);
   const relativePath = relative(sessionsDir, candidatePath);
-  return relativePath !== ""
-    && relativePath !== ".."
-    && !relativePath.startsWith(`..${sep}`)
-    && !isAbsolute(relativePath)
+  return relativePath !== "" &&
+    relativePath !== ".." &&
+    !relativePath.startsWith(`..${sep}`) &&
+    !isAbsolute(relativePath)
     ? candidatePath
     : null;
 }
@@ -312,7 +378,8 @@ function findSessionIdByPath(filePath: string): string | undefined {
 }
 
 export function invalidateSessionListCache(): void {
-  globalThis.__piSessionListGeneration = (globalThis.__piSessionListGeneration ?? 0) + 1;
+  globalThis.__piSessionListGeneration =
+    (globalThis.__piSessionListGeneration ?? 0) + 1;
   globalThis.__piSessionListCache = undefined;
 }
 
@@ -321,16 +388,20 @@ export function getSessionListVersion(): number {
 }
 
 function getPathCache(): Map<string, string> {
-  if (!globalThis.__piSessionPathCache) globalThis.__piSessionPathCache = new Map();
+  if (!globalThis.__piSessionPathCache)
+    globalThis.__piSessionPathCache = new Map();
   return globalThis.__piSessionPathCache;
 }
 
 function getPathToIdCache(): Map<string, string> {
-  if (!globalThis.__piPathToSessionIdCache) globalThis.__piPathToSessionIdCache = new Map();
+  if (!globalThis.__piPathToSessionIdCache)
+    globalThis.__piPathToSessionIdCache = new Map();
   return globalThis.__piPathToSessionIdCache;
 }
 
-export async function resolveSessionPath(sessionId: string): Promise<string | null> {
+export async function resolveSessionPath(
+  sessionId: string,
+): Promise<string | null> {
   const cached = getPathCache().get(sessionId);
   if (cached) return cached;
 
@@ -346,7 +417,9 @@ export async function resolveSessionPath(sessionId: string): Promise<string | nu
   return getPathCache().get(sessionId) ?? null;
 }
 
-export async function resolveSessionIdByPath(filePath: string): Promise<string | undefined> {
+export async function resolveSessionIdByPath(
+  filePath: string,
+): Promise<string | undefined> {
   const pathKey = sessionPathKey(filePath);
   const cached = getPathToIdCache().get(pathKey);
   if (cached) return cached;
@@ -364,10 +437,18 @@ export function cacheSessionPath(sessionId: string, filePath: string): void {
   const pathCache = getPathCache();
   const reverseCache = getPathToIdCache();
   const previousPath = pathCache.get(sessionId);
-  const previousPathKey = previousPath ? sessionPathKey(previousPath) : undefined;
+  const previousPathKey = previousPath
+    ? sessionPathKey(previousPath)
+    : undefined;
   const previousSessionId = reverseCache.get(pathKey);
-  const previousOwnerPath = previousSessionId ? pathCache.get(previousSessionId) : undefined;
-  if (previousPathKey && previousPathKey !== pathKey && reverseCache.get(previousPathKey) === sessionId) {
+  const previousOwnerPath = previousSessionId
+    ? pathCache.get(previousSessionId)
+    : undefined;
+  if (
+    previousPathKey &&
+    previousPathKey !== pathKey &&
+    reverseCache.get(previousPathKey) === sessionId
+  ) {
     reverseCache.delete(previousPathKey);
   }
   if (
@@ -394,7 +475,11 @@ export function invalidateSessionPathCache(sessionId: string): void {
 }
 
 export function readSessionHeader(filePath: string): SessionHeader | null {
-  const firstLine = readBoundedLines(filePath, SESSION_HEADER_MAX_BYTES, 1)[0]?.trimEnd();
+  const firstLine = readBoundedLines(
+    filePath,
+    SESSION_HEADER_MAX_BYTES,
+    1,
+  )[0]?.trimEnd();
   if (!firstLine) return null;
   try {
     const header = JSON.parse(firstLine) as SessionHeader;
@@ -412,7 +497,10 @@ export function getSessionEntries(filePath: string): SessionEntry[] {
   return entries as unknown as SessionEntry[];
 }
 
-function getSessionSettings(entries: SessionEntry[], leafId?: string | null): Pick<SessionContext, "thinkingLevel" | "model"> {
+function getSessionSettings(
+  entries: SessionEntry[],
+  leafId?: string | null,
+): Pick<SessionContext, "thinkingLevel" | "model"> {
   if (leafId === null) return { thinkingLevel: "off", model: null };
   const byId = new Map(entries.map((entry) => [entry.id, entry]));
   let current = leafId ? byId.get(leafId) : undefined;
@@ -421,14 +509,27 @@ function getSessionSettings(entries: SessionEntry[], leafId?: string | null): Pi
   let model: SessionContext["model"] | undefined;
 
   while (current && (thinkingLevel === undefined || model === undefined)) {
-    if (thinkingLevel === undefined && current.type === "thinking_level_change") {
+    if (
+      thinkingLevel === undefined &&
+      current.type === "thinking_level_change"
+    ) {
       thinkingLevel = current.thinkingLevel;
     }
     if (model === undefined && current.type === "model_change") {
       model = { provider: current.provider, modelId: current.modelId };
-    } else if (model === undefined && current.type === "message" && current.message.role === "assistant") {
-      const message = current.message as { provider?: unknown; model?: unknown };
-      if (typeof message.provider === "string" && typeof message.model === "string") {
+    } else if (
+      model === undefined &&
+      current.type === "message" &&
+      current.message.role === "assistant"
+    ) {
+      const message = current.message as {
+        provider?: unknown;
+        model?: unknown;
+      };
+      if (
+        typeof message.provider === "string" &&
+        typeof message.model === "string"
+      ) {
         model = { provider: message.provider, modelId: message.model };
       }
     }
@@ -455,9 +556,15 @@ export function buildSessionContext(
   const { tail, excludeLeaf } = options;
   // History pages retain the original branch order, including compacted messages.
   // SDK context filtering can drop a page's messages when firstKeptEntryId is outside it.
-  const sliced = leafId === null ? [] : sliceActiveBranch(
-    entries, leafId ?? null, tail && tail > 0 ? tail : entries.length, excludeLeaf,
-  );
+  const sliced =
+    leafId === null
+      ? []
+      : sliceActiveBranch(
+          entries,
+          leafId ?? null,
+          tail && tail > 0 ? tail : entries.length,
+          excludeLeaf,
+        );
   const hasMore = Boolean(tail && tail > 0 && sliced[0]?.parentId);
 
   // Convert messages and their IDs together to keep fork/navigation targets aligned.
@@ -511,7 +618,8 @@ function countsTowardTail(entry: SessionEntry): boolean {
  * dumps (tail = whole session) are never truncated. Older history still
  * pages in via `before`. */
 const MAX_RAW_WINDOW_ENTRIES = 1500;
-const rawWindowCap = (tail: number) => Math.max(MAX_RAW_WINDOW_ENTRIES, tail * 30);
+const rawWindowCap = (tail: number) =>
+  Math.max(MAX_RAW_WINDOW_ENTRIES, tail * 30);
 
 export function sliceActiveBranch(
   entries: SessionEntry[],
@@ -550,7 +658,9 @@ function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
 }
 
-function base64ImageInfo(block: unknown): { bytes: number; mime?: string } | null {
+function base64ImageInfo(
+  block: unknown,
+): { bytes: number; mime?: string } | null {
   if (!isRecord(block) || block.type !== "image") return null;
 
   let data: string | undefined;
@@ -558,14 +668,24 @@ function base64ImageInfo(block: unknown): { bytes: number; mime?: string } | nul
   if (typeof block.data === "string") {
     data = block.data;
     mime = typeof block.mimeType === "string" ? block.mimeType : undefined;
-  } else if (isRecord(block.source) && block.source.type === "base64" && typeof block.source.data === "string") {
+  } else if (
+    isRecord(block.source) &&
+    block.source.type === "base64" &&
+    typeof block.source.data === "string"
+  ) {
     data = block.source.data;
-    mime = typeof block.source.media_type === "string" ? block.source.media_type : undefined;
+    mime =
+      typeof block.source.media_type === "string"
+        ? block.source.media_type
+        : undefined;
   }
   if (!data) return null;
 
   const padding = data.endsWith("==") ? 2 : data.endsWith("=") ? 1 : 0;
-  return { bytes: Math.max(0, Math.floor(data.length * 3 / 4) - padding), mime };
+  return {
+    bytes: Math.max(0, Math.floor((data.length * 3) / 4) - padding),
+    mime,
+  };
 }
 
 function deferToolResultBase64Images(
@@ -629,21 +749,36 @@ function entryToUiMessage(
   switch (entry.type) {
     case "message": {
       let message = options.deferToolResultImages
-        ? deferToolResultBase64Images(normalizeToolCalls(entry.message), options.sessionId, entry.id)
+        ? deferToolResultBase64Images(
+            normalizeToolCalls(entry.message),
+            options.sessionId,
+            entry.id,
+          )
         : normalizeToolCalls(entry.message);
-      const legacyContent = message.role === "assistant" ? (message as { content: unknown }).content : undefined;
+      const legacyContent =
+        message.role === "assistant"
+          ? (message as { content: unknown }).content
+          : undefined;
       if (typeof legacyContent === "string") {
-        message = { ...message, content: [{ type: "text", text: legacyContent }] } as AgentMessage;
+        message = {
+          ...message,
+          content: [{ type: "text", text: legacyContent }],
+        } as AgentMessage;
       }
-      if (!options.deferThinking || message.role !== "assistant") return message;
+      if (!options.deferThinking || message.role !== "assistant")
+        return message;
       const content = message.content;
       return {
         ...message,
-        content: content.map((block) => (
+        content: content.map((block) =>
           block.type === "thinking" && block.thinking.trim() !== ""
-            ? { ...block, thinking: getThinkingPreview(block.thinking), deferred: true }
-            : block
-        )),
+            ? {
+                ...block,
+                thinking: getThinkingPreview(block.thinking),
+                deferred: true,
+              }
+            : block,
+        ),
       };
     }
     case "compaction":

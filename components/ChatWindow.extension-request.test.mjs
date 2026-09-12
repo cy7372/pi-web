@@ -2,9 +2,14 @@ import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 import test from "node:test";
 
-const source = await readFile(new URL("./ChatWindow.tsx", import.meta.url), "utf8");
+const source = await readFile(
+  new URL("./ChatWindow.tsx", import.meta.url),
+  "utf8",
+);
 const dialogSource = source.slice(source.indexOf("function ExtensionDialog"));
-const customSource = source.slice(source.indexOf("function ExtensionCustomPanel"));
+const customSource = source.slice(
+  source.indexOf("function ExtensionCustomPanel"),
+);
 
 test("confines extension overlays to the content region above the composer", () => {
   assert.doesNotMatch(source, /function ExtensionRequestSheet/);
@@ -31,7 +36,10 @@ test("adds collapse without replacing cancel", () => {
 test("resets collapse state when a new extension request arrives", () => {
   assert.match(source, /<ExtensionDialog key=\{extensionDialog.id\}/);
   assert.match(source, /<ExtensionCustomPanel key=\{extensionCustomUi.id\}/);
-  assert.match(customSource, /if \(!collapsed\) inputRef.current\?\.focus\(\);\s*}, \[collapsed\]\)/);
+  assert.match(
+    customSource,
+    /if \(!collapsed\) inputRef.current\?\.focus\(\);\s*}, \[collapsed\]\)/,
+  );
 });
 
 test("interactive custom panels expand by default after SSE replay", () => {

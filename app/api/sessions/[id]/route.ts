@@ -1,5 +1,12 @@
 import { NextResponse } from "next/server";
-import { existsSync, readdirSync, readFileSync, statSync, unlinkSync, writeFileSync } from "fs";
+import {
+  existsSync,
+  readdirSync,
+  readFileSync,
+  statSync,
+  unlinkSync,
+  writeFileSync,
+} from "fs";
 import { dirname, join } from "path";
 import { SessionManager } from "@earendil-works/pi-coding-agent";
 import {
@@ -17,12 +24,16 @@ import { projectTreeForResponse } from "@/lib/project-tree";
 import { computeSessionTotalActiveMs } from "@/lib/session-timing";
 import { computeSessionStats } from "@/lib/session-stats";
 import type { SessionEntry } from "@/lib/types";
-import { readSubagentRun, readSubagentSessionResources, SUBAGENT_META_TYPE } from "@/lib/subagents";
+import {
+  readSubagentRun,
+  readSubagentSessionResources,
+  SUBAGENT_META_TYPE,
+} from "@/lib/subagents";
 import { readSessionToolSelection } from "@/lib/session-tool-selection";
 
 export async function GET(
   req: Request,
-  { params }: { params: Promise<{ id: string }> }
+  { params }: { params: Promise<{ id: string }> },
 ) {
   const { id } = await params;
   try {
@@ -33,8 +44,10 @@ export async function GET(
       return NextResponse.json({ error: "Session not found" }, { status: 404 });
     }
 
-    const sm = liveRpc?.inner.sessionManager ?? SessionManager.open(resolvedPath!);
-    const filePath = liveRpc?.sessionFile || sm.getSessionFile() || resolvedPath || "";
+    const sm =
+      liveRpc?.inner.sessionManager ?? SessionManager.open(resolvedPath!);
+    const filePath =
+      liveRpc?.sessionFile || sm.getSessionFile() || resolvedPath || "";
     const entries = sm.getEntries();
     const leafId = sm.getLeafId();
     const tree = projectTreeForResponse(sm.getTree());
@@ -42,7 +55,8 @@ export async function GET(
     const deferThinking = searchParams.has("deferThinking");
     const deferToolResultImages = searchParams.has("deferMedia");
     const rawTail = Number(searchParams.get("tail"));
-    const tail = Number.isFinite(rawTail) && rawTail > 0 ? Math.min(rawTail, 1000) : 50;
+    const tail =
+      Number.isFinite(rawTail) && rawTail > 0 ? Math.min(rawTail, 1000) : 50;
     const context = buildSessionContext(entries as never, leafId, {
       deferThinking,
       deferToolResultImages,
@@ -57,42 +71,82 @@ export async function GET(
     // (same discriminated-union shape pi writes to .jsonl files).
     const stats = computeSessionStats(entries as unknown as SessionEntry[]);
     const sessionName = sm.getSessionName();
-    const firstUserEntry = entries.find((entry) => entry.type === "message" && entry.message.role === "user");
-    const firstUserMessage = firstUserEntry?.type === "message" ? firstUserEntry.message : undefined;
+    const firstUserEntry = entries.find(
+      (entry) => entry.type === "message" && entry.message.role === "user",
+    );
+    const firstUserMessage =
+      firstUserEntry?.type === "message" ? firstUserEntry.message : undefined;
 
     const header = sm.getHeader();
     let modified = header?.timestamp ?? new Date().toISOString();
-    try { modified = statSync(filePath).mtime.toISOString(); } catch { /* use header timestamp */ }
+    try {
+      modified = statSync(filePath).mtime.toISOString();
+    } catch {
+      /* use header timestamp */
+    }
     const parentSessionId = header?.parentSession
       ? await resolveSessionIdByPath(header.parentSession)
       : undefined;
     const subagent = header
       ? readSubagentRun(entries as never, header.id, filePath)
       : null;
-    const toolNames = readSubagentSessionResources(entries as never)?.tools
-      ?? readSessionToolSelection(entries as never);
-    const info = header ? (await attachSessionProjectInfo([{
-      path: filePath,
-      id: header.id,
-      cwd: header.cwd ?? "",
-      name: sessionName,
-      created: header.timestamp,
-      modified,
-      messageCount: stats.totalMessages,
-      firstMessage: firstUserMessage
-        ? (() => {
-            const c = (firstUserMessage as { content: unknown }).content;
-            return typeof c === "string" ? c : (Array.isArray(c) ? (c.find((b: { type: string }) => b.type === "text") as { text: string } | undefined)?.text ?? "" : "") || "(no messages)";
-          })()
-        : "(no messages)",
-      parentSessionId,
-      ...(subagent
-        ? { relation: { kind: "subagent" as const, parentSessionId: subagent.parentSessionId, profile: subagent.profile, description: subagent.description, status: liveRpc?.isRunning() ? "running" as const : subagent.status } }
-        : header.parentSession
-          ? { relation: { kind: "fork" as const, ...(parentSessionId ? { originSessionId: parentSessionId } : {}) } }
-          : {}),
-      transient: !filePath || !existsSync(filePath),
-    }]))[0] : null;
+    const toolNames =
+      readSubagentSessionResources(entries as never)?.tools ??
+      readSessionToolSelection(entries as never);
+    const info = header
+      ? (
+          await attachSessionProjectInfo([
+            {
+              path: filePath,
+              id: header.id,
+              cwd: header.cwd ?? "",
+              name: sessionName,
+              created: header.timestamp,
+              modified,
+              messageCount: stats.totalMessages,
+              firstMessage: firstUserMessage
+                ? (() => {
+                    const c = (firstUserMessage as { content: unknown })
+                      .content;
+                    return typeof c === "string"
+                      ? c
+                      : (Array.isArray(c)
+                          ? ((
+                              c.find(
+                                (b: { type: string }) => b.type === "text",
+                              ) as { text: string } | undefined
+                            )?.text ?? "")
+                          : "") || "(no messages)";
+                  })()
+                : "(no messages)",
+              parentSessionId,
+              ...(subagent
+                ? {
+                    relation: {
+                      kind: "subagent" as const,
+                      parentSessionId: subagent.parentSessionId,
+                      profile: subagent.profile,
+                      description: subagent.description,
+                      status: liveRpc?.isRunning()
+                        ? ("running" as const)
+                        : subagent.status,
+                    },
+                  }
+                : header.parentSession
+                  ? {
+                      relation: {
+                        kind: "fork" as const,
+                        ...(parentSessionId
+                          ? { originSessionId: parentSessionId }
+                          : {}),
+                      },
+                    }
+                  : {}),
+              transient: !filePath || !existsSync(filePath),
+            },
+          ])
+        )[0]
+      : null;
 
     return NextResponse.json({
       sessionId: id,
@@ -113,11 +167,11 @@ export async function GET(
 // PATCH /api/sessions/[id]  body: { name: string }
 export async function PATCH(
   req: Request,
-  { params }: { params: Promise<{ id: string }> }
+  { params }: { params: Promise<{ id: string }> },
 ) {
   const { id } = await params;
   try {
-    const { name } = await req.json() as { name?: string };
+    const { name } = (await req.json()) as { name?: string };
     if (typeof name !== "string") {
       return NextResponse.json({ error: "name is required" }, { status: 400 });
     }
@@ -137,7 +191,7 @@ export async function PATCH(
 // DELETE /api/sessions/[id]
 export async function DELETE(
   _req: Request,
-  { params }: { params: Promise<{ id: string }> }
+  { params }: { params: Promise<{ id: string }> },
 ) {
   const { id } = await params;
   try {
@@ -164,14 +218,19 @@ export async function DELETE(
     const dir = dirname(filePath);
     try {
       const files = readdirSync(dir).filter(
-        (file) => file.endsWith(".jsonl") && sessionPathKey(join(dir, file)) !== targetPathKey,
+        (file) =>
+          file.endsWith(".jsonl") &&
+          sessionPathKey(join(dir, file)) !== targetPathKey,
       );
       for (const file of files) {
         const childPath = join(dir, file);
         try {
           const content = readFileSync(childPath, "utf8");
           const lines = content.split("\n");
-          const header = JSON.parse(lines[0]) as { type?: string; parentSession?: string };
+          const header = JSON.parse(lines[0]) as {
+            type?: string;
+            parentSession?: string;
+          };
           if (
             header.type === "session" &&
             header.parentSession &&
@@ -182,19 +241,24 @@ export async function DELETE(
             lines[0] = JSON.stringify(header);
             if (parentSessionPath && parentSessionId) {
               for (let index = 1; index < lines.length; index += 1) {
-                let entry: { type?: string; customType?: string; data?: unknown };
+                let entry: {
+                  type?: string;
+                  customType?: string;
+                  data?: unknown;
+                };
                 try {
                   entry = JSON.parse(lines[index]);
                 } catch {
                   continue;
                 }
                 if (
-                  entry.type !== "custom"
-                  || entry.customType !== SUBAGENT_META_TYPE
-                  || typeof entry.data !== "object"
-                  || entry.data === null
-                  || Array.isArray(entry.data)
-                ) continue;
+                  entry.type !== "custom" ||
+                  entry.customType !== SUBAGENT_META_TYPE ||
+                  typeof entry.data !== "object" ||
+                  entry.data === null ||
+                  Array.isArray(entry.data)
+                )
+                  continue;
                 entry.data = {
                   ...entry.data,
                   parentSessionId,
@@ -206,9 +270,13 @@ export async function DELETE(
             }
             writeFileSync(childPath, lines.join("\n"));
           }
-        } catch { /* skip malformed */ }
+        } catch {
+          /* skip malformed */
+        }
       }
-    } catch { /* skip if dir unreadable */ }
+    } catch {
+      /* skip if dir unreadable */
+    }
 
     await getRpcSession(id)?.shutdown();
     unlinkSync(filePath);

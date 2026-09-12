@@ -9,7 +9,9 @@ export interface RecentProject {
 }
 
 /** Projects sorted by most recent activity and deduplicated by stable key. */
-export function getRecentProjects(sessions: readonly SessionInfo[]): RecentProject[] {
+export function getRecentProjects(
+  sessions: readonly SessionInfo[],
+): RecentProject[] {
   const latestByProject = new Map<string, { root: string; modified: string }>();
   for (const session of sessions) {
     const root = session.projectRoot ?? session.cwd;
@@ -31,7 +33,10 @@ export function getProjectActivity(
   unreadSessionIds: ReadonlySet<string>,
   awaitingInputSessionIds?: ReadonlySet<string>,
 ): Map<string, { running: number; awaiting: number; unread: number }> {
-  const counts = new Map<string, { running: number; awaiting: number; unread: number }>();
+  const counts = new Map<
+    string,
+    { running: number; awaiting: number; unread: number }
+  >();
   for (const session of sessions) {
     const key = workspaceKeyOf(session);
     if (!key) continue;

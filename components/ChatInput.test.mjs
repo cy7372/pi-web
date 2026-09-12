@@ -11,71 +11,216 @@ const jiti = createJiti(import.meta.url, {
 });
 const React = await jiti.import("react");
 const { renderToStaticMarkup } = await jiti.import("react-dom/server");
-const { ChatInput, ModelErrorBanner, ModelScopeWarningBanner, canClearBuiltinCommandInput, canRestoreUserMessage, canRunBuiltinSlashCommandWhileStreaming, compressImageFile, filterModelOptions, getUpwardMenuMaxHeight, getUserMessageText, getUserMessageDraftImages, isExactSlashCommand, modelSupportsImageInput, shouldCompressImageFile } = await jiti.import("./ChatInput.tsx");
+const {
+  ChatInput,
+  ModelErrorBanner,
+  ModelScopeWarningBanner,
+  canClearBuiltinCommandInput,
+  canRestoreUserMessage,
+  canRunBuiltinSlashCommandWhileStreaming,
+  compressImageFile,
+  filterModelOptions,
+  getUpwardMenuMaxHeight,
+  getUserMessageText,
+  getUserMessageDraftImages,
+  isExactSlashCommand,
+  modelSupportsImageInput,
+  shouldCompressImageFile,
+} = await jiti.import("./ChatInput.tsx");
 const { ModelSelector } = await jiti.import("./ModelSelector.tsx");
 // Note: import specifier must match ChatInput.tsx ("@/lib/draft-store", no .ts
 // extension). On Windows jiti caches the two specifiers as separate module
 // instances, so a .ts-suffixed import here would hold a different drafts Map
 // than the component reads, breaking draft-restore assertions.
-const { clearDraft, getDraft, mergeRestoredSubmissionDraft, mergeRestoredSubmissionText, rekeyDraft, setDraft } = await jiti.import("@/lib/draft-store");
+const {
+  clearDraft,
+  getDraft,
+  mergeRestoredSubmissionDraft,
+  mergeRestoredSubmissionText,
+  rekeyDraft,
+  setDraft,
+} = await jiti.import("@/lib/draft-store");
 const { I18nProvider } = await jiti.import("@/hooks/useI18n");
 
 test("follow-up shortcuts preserve newline, IME, mobile and completion behavior", () => {
-  const source = ts.createSourceFile("ChatInput.tsx", readFileSync(new URL("./ChatInput.tsx", import.meta.url), "utf8"), ts.ScriptTarget.Latest, true, ts.ScriptKind.TSX);
+  const source = ts.createSourceFile(
+    "ChatInput.tsx",
+    readFileSync(new URL("./ChatInput.tsx", import.meta.url), "utf8"),
+    ts.ScriptTarget.Latest,
+    true,
+    ts.ScriptKind.TSX,
+  );
   function findHandler(node) {
-    if (ts.isVariableDeclaration(node) && node.name.getText(source) === "handleKeyDown") {
+    if (
+      ts.isVariableDeclaration(node) &&
+      node.name.getText(source) === "handleKeyDown"
+    ) {
       return node.initializer.arguments[0];
     }
     return ts.forEachChild(node, findHandler);
   }
   // Execute the component's actual callback without mounting the rest of the UI.
-  const script = new Script(ts.transpileModule(findHandler(source).getText(source), {
-    compilerOptions: { target: ts.ScriptTarget.ES2020 },
-  }).outputText);
+  const script = new Script(
+    ts.transpileModule(findHandler(source).getText(source), {
+      compilerOptions: { target: ts.ScriptTarget.ES2020 },
+    }).outputText,
+  );
   const cases = [
     ["Enter steers", {}, {}, "steer"],
     ["Alt+Enter follows up", { altKey: true }, {}, "followup"],
     ["idle Alt+Enter sends", { altKey: true }, { isStreaming: false }, "send"],
     ["Shift+Enter inserts a newline", { shiftKey: true }, {}, "native"],
-    ["Alt+Shift+Enter keeps native behavior", { altKey: true, shiftKey: true }, {}, "native"],
-    ["composition ref blocks sending", { altKey: true }, { isComposingRef: { current: true } }, "native"],
-    ["native composition blocks sending", { altKey: true, nativeEvent: { isComposing: true } }, {}, "native"],
-    ["IME keyCode blocks sending", { altKey: true, nativeEvent: { keyCode: 229 } }, {}, "native"],
-    ["composition grace blocks sending", { altKey: true }, { lastCompositionEndAtRef: { current: 950 } }, "prevented"],
-    ["mobile Alt+Enter keeps native behavior", { altKey: true }, { isMobile: true }, "native"],
-    ["mobile composition grace cannot send", { altKey: true }, { isMobile: true, lastCompositionEndAtRef: { current: 950 } }, "native"],
-    ["mobile Ctrl+Alt+Enter follows up", { altKey: true, ctrlKey: true }, { isMobile: true }, "followup"],
-    ["mobile Cmd+Alt+Enter follows up", { altKey: true, metaKey: true }, { isMobile: true }, "followup"],
-    ["mobile modified Enter respects composition grace", { altKey: true, ctrlKey: true }, { isMobile: true, lastCompositionEndAtRef: { current: 950 } }, "prevented"],
+    [
+      "Alt+Shift+Enter keeps native behavior",
+      { altKey: true, shiftKey: true },
+      {},
+      "native",
+    ],
+    [
+      "composition ref blocks sending",
+      { altKey: true },
+      { isComposingRef: { current: true } },
+      "native",
+    ],
+    [
+      "native composition blocks sending",
+      { altKey: true, nativeEvent: { isComposing: true } },
+      {},
+      "native",
+    ],
+    [
+      "IME keyCode blocks sending",
+      { altKey: true, nativeEvent: { keyCode: 229 } },
+      {},
+      "native",
+    ],
+    [
+      "composition grace blocks sending",
+      { altKey: true },
+      { lastCompositionEndAtRef: { current: 950 } },
+      "prevented",
+    ],
+    [
+      "mobile Alt+Enter keeps native behavior",
+      { altKey: true },
+      { isMobile: true },
+      "native",
+    ],
+    [
+      "mobile composition grace cannot send",
+      { altKey: true },
+      { isMobile: true, lastCompositionEndAtRef: { current: 950 } },
+      "native",
+    ],
+    [
+      "mobile Ctrl+Alt+Enter follows up",
+      { altKey: true, ctrlKey: true },
+      { isMobile: true },
+      "followup",
+    ],
+    [
+      "mobile Cmd+Alt+Enter follows up",
+      { altKey: true, metaKey: true },
+      { isMobile: true },
+      "followup",
+    ],
+    [
+      "mobile modified Enter respects composition grace",
+      { altKey: true, ctrlKey: true },
+      { isMobile: true, lastCompositionEndAtRef: { current: 950 } },
+      "prevented",
+    ],
     ["Enter falls back to follow-up", {}, { onSteer: undefined }, "followup"],
-    ["Alt+Enter falls back to steer", { altKey: true }, { onFollowUp: undefined }, "steer"],
-    ["slash completion takes priority", { altKey: true }, { slashMenuOpen: true, slashQuery: "help" }, "slash"],
-    ["available built-in commands take priority", { altKey: true }, { slashMenuOpen: true, slashQuery: "copy", value: "/copy", displayedSlashCommands: [{ name: "copy", source: "builtin", availableWhileStreaming: true }] }, "send"],
-    ["file completion takes priority", { altKey: true }, { atMenuOpen: true, atQuery: {} }, "file"],
-    ["history selection takes priority", { altKey: true }, { historyMenuOpen: true }, "history"],
+    [
+      "Alt+Enter falls back to steer",
+      { altKey: true },
+      { onFollowUp: undefined },
+      "steer",
+    ],
+    [
+      "slash completion takes priority",
+      { altKey: true },
+      { slashMenuOpen: true, slashQuery: "help" },
+      "slash",
+    ],
+    [
+      "available built-in commands take priority",
+      { altKey: true },
+      {
+        slashMenuOpen: true,
+        slashQuery: "copy",
+        value: "/copy",
+        displayedSlashCommands: [
+          { name: "copy", source: "builtin", availableWhileStreaming: true },
+        ],
+      },
+      "send",
+    ],
+    [
+      "file completion takes priority",
+      { altKey: true },
+      { atMenuOpen: true, atQuery: {} },
+      "file",
+    ],
+    [
+      "history selection takes priority",
+      { altKey: true },
+      { historyMenuOpen: true },
+      "history",
+    ],
   ];
   for (const [name, keys, state, expected] of cases) {
     let action = "native";
     const handler = script.runInNewContext({
       Date: { now: () => 1000 },
       COMPOSITION_END_ENTER_GRACE_MS: 100,
-      isMobile: false, isStreaming: true,
-      isComposingRef: { current: false }, lastCompositionEndAtRef: { current: 0 },
-      historyMenuOpen: false, inputHistory: ["previous"], historyActiveIndex: 0,
-      slashMenuOpen: false, slashQuery: null, displayedSlashCommands: [{}], slashActiveIndex: 0,
-      atMenuOpen: false, atQuery: null, atMatches: [{}], atActiveIndex: 0,
-      onSteer() {}, onFollowUp() {},
-      sendQueued(mode) { action = mode; }, handleSend() { action = "send"; },
-      applySlashCommand() { action = "slash"; },
-      isExactSlashCommand, value: "", setSlashMenuOpen() {},
-      applyAtCompletion() { action = "file"; },
-      applyHistoryInput() { action = "history"; },
+      isMobile: false,
+      isStreaming: true,
+      isComposingRef: { current: false },
+      lastCompositionEndAtRef: { current: 0 },
+      historyMenuOpen: false,
+      inputHistory: ["previous"],
+      historyActiveIndex: 0,
+      slashMenuOpen: false,
+      slashQuery: null,
+      displayedSlashCommands: [{}],
+      slashActiveIndex: 0,
+      atMenuOpen: false,
+      atQuery: null,
+      atMatches: [{}],
+      atActiveIndex: 0,
+      onSteer() {},
+      onFollowUp() {},
+      sendQueued(mode) {
+        action = mode;
+      },
+      handleSend() {
+        action = "send";
+      },
+      applySlashCommand() {
+        action = "slash";
+      },
+      isExactSlashCommand,
+      value: "",
+      setSlashMenuOpen() {},
+      applyAtCompletion() {
+        action = "file";
+      },
+      applyHistoryInput() {
+        action = "history";
+      },
       ...state,
     });
     handler({
-      key: "Enter", shiftKey: false, altKey: false, ctrlKey: false, metaKey: false,
+      key: "Enter",
+      shiftKey: false,
+      altKey: false,
+      ctrlKey: false,
+      metaKey: false,
       nativeEvent: { isComposing: false, keyCode: 13 },
-      preventDefault() { action = "prevented"; },
+      preventDefault() {
+        action = "prevented";
+      },
       ...keys,
     });
     assert.equal(action, expected, name);
@@ -84,12 +229,22 @@ test("follow-up shortcuts preserve newline, IME, mobile and completion behavior"
 
 test("shows the follow-up shortcut in the button tooltip", () => {
   const html = renderToStaticMarkup(
-    React.createElement(I18nProvider, null, React.createElement(ChatInput, {
-      onSend() {}, onAbort() {}, onFollowUp() {}, isStreaming: true,
-    })),
+    React.createElement(
+      I18nProvider,
+      null,
+      React.createElement(ChatInput, {
+        onSend() {},
+        onAbort() {},
+        onFollowUp() {},
+        isStreaming: true,
+      }),
+    ),
   );
 
-  assert.match(html, /title="Queue this message after the agent finishes \(Alt\/Option\+Enter\)"/);
+  assert.match(
+    html,
+    /title="Queue this message after the agent finishes \(Alt\/Option\+Enter\)"/,
+  );
   assert.match(html, /aria-keyshortcuts="Alt\+Enter"/);
 });
 
@@ -99,7 +254,8 @@ test("renders the upstream model error", () => {
       I18nProvider,
       null,
       React.createElement(ModelErrorBanner, {
-        error: "Invalid models.json schema:\nproviders.custom.models.0.id must not be empty",
+        error:
+          "Invalid models.json schema:\nproviders.custom.models.0.id must not be empty",
       }),
     ),
   );
@@ -112,7 +268,11 @@ test("renders the upstream model error", () => {
 test("does not render an empty model error", () => {
   assert.equal(
     renderToStaticMarkup(
-      React.createElement(I18nProvider, null, React.createElement(ModelErrorBanner, { error: null })),
+      React.createElement(
+        I18nProvider,
+        null,
+        React.createElement(ModelErrorBanner, { error: null }),
+      ),
     ),
     "",
   );
@@ -133,7 +293,11 @@ test("renders enabledModels scope warnings", () => {
   assert.match(html, /ghost-gateway/);
   assert.equal(
     renderToStaticMarkup(
-      React.createElement(I18nProvider, null, React.createElement(ModelScopeWarningBanner, { warnings: [] })),
+      React.createElement(
+        I18nProvider,
+        null,
+        React.createElement(ModelScopeWarningBanner, { warnings: [] }),
+      ),
     ),
     "",
   );
@@ -229,7 +393,13 @@ test("shows and locks the optimistic model while a switch is pending", () => {
         onModelChange() {},
         isStreaming: false,
         model: { provider: "deepseek", modelId: "deepseek-v4-flash" },
-        modelList: [{ provider: "deepseek", id: "deepseek-v4-flash", name: "DeepSeek V4 Flash" }],
+        modelList: [
+          {
+            provider: "deepseek",
+            id: "deepseek-v4-flash",
+            name: "DeepSeek V4 Flash",
+          },
+        ],
         modelSwitching: true,
       }),
     ),
@@ -245,7 +415,11 @@ test("shows and locks the optimistic model while a switch is pending", () => {
 test("filters model options by name and id", () => {
   const options = [
     { provider: "ollama", modelId: "qwen3:latest", name: "Qwen 3" },
-    { provider: "anthropic", modelId: "claude-sonnet-4-6", name: "Claude Sonnet 4.6" },
+    {
+      provider: "anthropic",
+      modelId: "claude-sonnet-4-6",
+      name: "Claude Sonnet 4.6",
+    },
     { provider: "openai", modelId: "gpt-5.4", name: "GPT-5.4" },
   ];
 
@@ -263,7 +437,9 @@ test("renders the shared field model selector as a disabled gray control", () =>
       I18nProvider,
       null,
       React.createElement(ModelSelector, {
-        options: [{ provider: "openai", modelId: "gpt-5.6-sol", name: "GPT-5.6 Sol" }],
+        options: [
+          { provider: "openai", modelId: "gpt-5.6-sol", name: "GPT-5.6 Sol" },
+        ],
         value: null,
         onChange() {},
         onClear() {},
@@ -287,9 +463,18 @@ test("caps an upward menu to the visible space above its anchor", () => {
 });
 
 test("compresses large images while preserving small images and GIFs", async () => {
-  assert.equal(shouldCompressImageFile({ size: 1024 * 1024, type: "image/png" }), false);
-  assert.equal(shouldCompressImageFile({ size: 1024 * 1024 + 1, type: "image/png" }), true);
-  assert.equal(shouldCompressImageFile({ size: 2 * 1024 * 1024, type: "image/gif" }), false);
+  assert.equal(
+    shouldCompressImageFile({ size: 1024 * 1024, type: "image/png" }),
+    false,
+  );
+  assert.equal(
+    shouldCompressImageFile({ size: 1024 * 1024 + 1, type: "image/png" }),
+    true,
+  );
+  assert.equal(
+    shouldCompressImageFile({ size: 2 * 1024 * 1024, type: "image/gif" }),
+    false,
+  );
 
   const originals = {
     FileReader: globalThis.FileReader,
@@ -313,19 +498,31 @@ test("compresses large images while preserving small images and GIFs", async () 
   };
   globalThis.createImageBitmap = async () => {
     bitmapCalls += 1;
-    return { width: 2048, height: 1024, close() { closed = true; } };
+    return {
+      width: 2048,
+      height: 1024,
+      close() {
+        closed = true;
+      },
+    };
   };
   globalThis.document = { createElement: () => canvas };
 
   try {
-    assert.deepEqual(await compressImageFile({ size: 1024, type: "image/png" }), {
-      data: "ORIGINAL",
-      mimeType: "image/png",
-    });
-    assert.deepEqual(await compressImageFile({ size: 2 * 1024 * 1024, type: "image/png" }), {
-      data: "COMPRESSED",
-      mimeType: "image/jpeg",
-    });
+    assert.deepEqual(
+      await compressImageFile({ size: 1024, type: "image/png" }),
+      {
+        data: "ORIGINAL",
+        mimeType: "image/png",
+      },
+    );
+    assert.deepEqual(
+      await compressImageFile({ size: 2 * 1024 * 1024, type: "image/png" }),
+      {
+        data: "COMPRESSED",
+        mimeType: "image/jpeg",
+      },
+    );
     assert.equal(bitmapCalls, 1);
     assert.equal(canvas.width, 1024);
     assert.equal(canvas.height, 512);
@@ -343,7 +540,10 @@ test("recognizes exact slash commands for one-Enter submission", () => {
   assert.equal(isExactSlashCommand("  /copy  ", builtin), true);
   assert.equal(isExactSlashCommand("/co", builtin), false);
   assert.equal(isExactSlashCommand("/copy extra", builtin), false);
-  assert.equal(isExactSlashCommand("/copy", { ...builtin, source: "extension" }), false);
+  assert.equal(
+    isExactSlashCommand("/copy", { ...builtin, source: "extension" }),
+    false,
+  );
 });
 
 test("clears a completed built-in only while its submitted input is unchanged", () => {
@@ -364,11 +564,17 @@ test("restores text and base64 images when editing a user message", () => {
     role: "user",
     content: [
       { type: "text", text: "Review this image @src/example.ts " },
-      { type: "image", source: { type: "base64", media_type: "image/png", data: "AQID" } },
+      {
+        type: "image",
+        source: { type: "base64", media_type: "image/png", data: "AQID" },
+      },
     ],
   };
 
-  assert.equal(getUserMessageText(message), "Review this image @src/example.ts ");
+  assert.equal(
+    getUserMessageText(message),
+    "Review this image @src/example.ts ",
+  );
   assert.deepEqual(getUserMessageDraftImages(message), [
     { data: "AQID", mimeType: "image/png" },
   ]);
@@ -377,9 +583,7 @@ test("restores text and base64 images when editing a user message", () => {
 test("restores legacy flat image entries when editing a user message", () => {
   const message = {
     role: "user",
-    content: [
-      { type: "image", data: "AQID", mimeType: "image/jpeg" },
-    ],
+    content: [{ type: "image", data: "AQID", mimeType: "image/jpeg" }],
   };
 
   assert.deepEqual(getUserMessageDraftImages(message), [
@@ -438,7 +642,9 @@ test("keeps a failed first submission recoverable across a composer remount", ()
 
 test("preserves duplicate image attachments when restoring a submission", () => {
   const image = { data: "AQID", mimeType: "image/png" };
-  const restored = mergeRestoredSubmissionDraft("", [image, image], "", [image]);
+  const restored = mergeRestoredSubmissionDraft("", [image, image], "", [
+    image,
+  ]);
 
   assert.deepEqual(restored.images, [image, image, image]);
 });
@@ -468,7 +674,10 @@ test("rekey keeps a synchronously restored draft when React state is still empty
   const sessionKey = "session-rekey-race";
   clearDraft(provisionalKey);
   clearDraft(sessionKey);
-  setDraft(provisionalKey, { value: "restored before state flush", images: [] });
+  setDraft(provisionalKey, {
+    value: "restored before state flush",
+    images: [],
+  });
 
   assert.deepEqual(
     rekeyDraft(provisionalKey, sessionKey, { value: "", images: [] }),
@@ -484,7 +693,8 @@ test("rekey keeps a synchronously restored draft when React state is still empty
 });
 
 test("renders compact errors above the input as a wrapping alert", () => {
-  const error = "Compaction failed: OpenAI API error (403): <html>request forbidden</html>";
+  const error =
+    "Compaction failed: OpenAI API error (403): <html>request forbidden</html>";
   const html = renderToStaticMarkup(
     React.createElement(
       I18nProvider,
@@ -509,25 +719,62 @@ test("renders compact errors above the input as a wrapping alert", () => {
 test("modelSupportsImageInput warns only when modality info is known and lacks image", () => {
   const modelList = [
     { id: "text-only", name: "Text Only", provider: "ollama", input: ["text"] },
-    { id: "vision", name: "Vision", provider: "anthropic", input: ["text", "image"] },
+    {
+      id: "vision",
+      name: "Vision",
+      provider: "anthropic",
+      input: ["text", "image"],
+    },
     { id: "unknown", name: "Unknown", provider: "custom", input: undefined },
   ];
 
-  assert.equal(modelSupportsImageInput({ provider: "ollama", modelId: "text-only" }, modelList), false);
-  assert.equal(modelSupportsImageInput({ provider: "anthropic", modelId: "vision" }, modelList), true);
+  assert.equal(
+    modelSupportsImageInput(
+      { provider: "ollama", modelId: "text-only" },
+      modelList,
+    ),
+    false,
+  );
+  assert.equal(
+    modelSupportsImageInput(
+      { provider: "anthropic", modelId: "vision" },
+      modelList,
+    ),
+    true,
+  );
   // Unknown modality info never blocks the user.
-  assert.equal(modelSupportsImageInput({ provider: "custom", modelId: "unknown" }, modelList), true);
+  assert.equal(
+    modelSupportsImageInput(
+      { provider: "custom", modelId: "unknown" },
+      modelList,
+    ),
+    true,
+  );
   // Model missing from the list is treated as unknown.
-  assert.equal(modelSupportsImageInput({ provider: "x", modelId: "missing" }, modelList), true);
+  assert.equal(
+    modelSupportsImageInput({ provider: "x", modelId: "missing" }, modelList),
+    true,
+  );
   assert.equal(modelSupportsImageInput(null, modelList), true);
-  assert.equal(modelSupportsImageInput({ provider: "ollama", modelId: "text-only" }, undefined), true);
+  assert.equal(
+    modelSupportsImageInput(
+      { provider: "ollama", modelId: "text-only" },
+      undefined,
+    ),
+    true,
+  );
 });
 
 test("renders image warnings for known text-only defaults without an explicit model selection", () => {
   const draftKey = "new:/tmp/image-warning-default";
   const modelList = [
     { id: "text-only", name: "Text Only", provider: "custom", input: ["text"] },
-    { id: "vision", name: "Vision", provider: "custom", input: ["text", "image"] },
+    {
+      id: "vision",
+      name: "Vision",
+      provider: "custom",
+      input: ["text", "image"],
+    },
     { id: "unknown", name: "Unknown", provider: "custom" },
   ];
   setDraft(draftKey, {
@@ -536,7 +783,12 @@ test("renders image warnings for known text-only defaults without an explicit mo
   });
 
   try {
-    for (const [modelId, warningExpected] of [["text-only", true], ["vision", false], ["unknown", false], [null, false]]) {
+    for (const [modelId, warningExpected] of [
+      ["text-only", true],
+      ["vision", false],
+      ["unknown", false],
+      [null, false],
+    ]) {
       const html = renderToStaticMarkup(
         React.createElement(
           I18nProvider,
@@ -554,9 +806,16 @@ test("renders image warnings for known text-only defaults without an explicit mo
       );
 
       assert.match(html, /<img/);
-      assert.equal(html.includes("Images may not be sent"), warningExpected, `default model: ${modelId}`);
+      assert.equal(
+        html.includes("Images may not be sent"),
+        warningExpected,
+        `default model: ${modelId}`,
+      );
       if (warningExpected) {
-        assert.match(html, /The selected model \(Text Only\) does not support image input/);
+        assert.match(
+          html,
+          /The selected model \(Text Only\) does not support image input/,
+        );
         assert.ok(html.indexOf('role="alert"') < html.indexOf("<textarea"));
       }
     }

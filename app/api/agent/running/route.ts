@@ -17,7 +17,8 @@ export async function GET() {
       // Sessions blocked on an extension ui_request (e.g. ask_user_question):
       // still "running" from the engine's view, but really waiting for the user.
       awaitingInputSessionIds: getAwaitingInputRpcSessionIds(),
-      completionNotificationSuppressedSessionIds: getCompletionNotificationSuppressedRpcSessionIds(),
+      completionNotificationSuppressedSessionIds:
+        getCompletionNotificationSuppressedRpcSessionIds(),
     },
     { headers: { "Cache-Control": "no-store" } },
   );

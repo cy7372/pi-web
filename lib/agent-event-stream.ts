@@ -30,13 +30,18 @@ const HEARTBEAT_INTERVAL_MS = 30_000;
 // Symbol.for + globalThis gives every copy the SAME registry.
 const CLOSER_REGISTRY: symbol = Symbol.for("pi-web.agentEventStreamClosers");
 type StreamCloser = (closeController: boolean | "error") => void;
-const activeStreamClosers: Set<StreamCloser> =
-  ((globalThis as Record<symbol, Set<StreamCloser>>)[CLOSER_REGISTRY] ??= new Set<StreamCloser>());
+const activeStreamClosers: Set<StreamCloser> = ((
+  globalThis as Record<symbol, Set<StreamCloser>>
+)[CLOSER_REGISTRY] ??= new Set<StreamCloser>());
 
 /** Close every live SSE stream (called on process shutdown signals). */
 export function closeAllAgentEventStreams(): void {
   for (const close of [...activeStreamClosers]) {
-    try { close("error"); } catch { /* stream already closed */ }
+    try {
+      close("error");
+    } catch {
+      /* stream already closed */
+    }
   }
 }
 
@@ -82,9 +87,17 @@ export function createAgentEventStream(
         unsubscribe = null;
         if (abortHandler) req.signal.removeEventListener("abort", abortHandler);
         if (closeController === "error") {
-          try { controller.error(new Error("pi-web server shutting down")); } catch { /* already closed */ }
+          try {
+            controller.error(new Error("pi-web server shutting down"));
+          } catch {
+            /* already closed */
+          }
         } else if (closeController) {
-          try { controller.close(); } catch { /* stream already closed */ }
+          try {
+            controller.close();
+          } catch {
+            /* stream already closed */
+          }
         }
       };
       cancelStream = cleanup;
@@ -161,7 +174,10 @@ export function createAgentEventStream(
       }
       req.signal.addEventListener("abort", abortHandler, { once: true });
 
-      heartbeat = setInterval(() => enqueueText(":\n\n"), HEARTBEAT_INTERVAL_MS);
+      heartbeat = setInterval(
+        () => enqueueText(":\n\n"),
+        HEARTBEAT_INTERVAL_MS,
+      );
 
       // Force the response headers through without claiming that the agent is
       // ready. The client waits for the later `connected` data event.

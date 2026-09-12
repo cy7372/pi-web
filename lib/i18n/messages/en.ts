@@ -14,25 +14,31 @@ export const enLocale: LocalePlugin = {
     "common.settings": "Settings",
     "settings.title": "Settings",
     "settings.general": "General",
-    "settings.generalDescription": "Choose how Pi Web looks and which language it uses.",
+    "settings.generalDescription":
+      "Choose how Pi Web looks and which language it uses.",
     "settings.appearance": "Appearance",
-    "settings.appearanceDescription": "Select a theme or follow your system preference.",
+    "settings.appearanceDescription":
+      "Select a theme or follow your system preference.",
     "settings.chatContentWidth": "Chat content width",
     "settings.chatContentFontSize": "Chat font size",
     "settings.resetChatContentWidth": "Reset chat content width",
     "settings.resetChatContentFontSize": "Reset chat font size",
-    "settings.chatContentWidthDescription": "Set the maximum width of messages and the composer.",
+    "settings.chatContentWidthDescription":
+      "Set the maximum width of messages and the composer.",
     "settings.themeLight": "Light",
     "settings.themeDark": "Dark",
     "settings.themeSystem": "System",
     "settings.thinkingDisplay": "Thinking display",
-    "settings.thinkingDisplayDescription": "Choose whether model reasoning blocks are expanded when messages load.",
+    "settings.thinkingDisplayDescription":
+      "Choose whether model reasoning blocks are expanded when messages load.",
     "settings.thinkingExpandedDefault": "Expand thinking blocks by default",
     "settings.chat": "Chat",
     "settings.quoteSelection": "Show actions for selected text",
-    "settings.languageDescription": "Choose the language used throughout the interface.",
+    "settings.languageDescription":
+      "Choose the language used throughout the interface.",
     "settings.shellTool": "Shell tool",
-    "settings.shellToolDescription": "Choose which shell the model uses for commands. Direct ! and !! commands still use Bash.",
+    "settings.shellToolDescription":
+      "Choose which shell the model uses for commands. Direct ! and !! commands still use Bash.",
     "settings.usePowerShell": "Use PowerShell instead of Bash",
     "settings.projectRequired": "Open a project to configure this section",
     "skills.scope.global": "global",
@@ -40,7 +46,8 @@ export const enLocale: LocalePlugin = {
     "skills.scope.path": "path",
     "agents.close": "Close",
     "agents.builtInTitle": "Enable Pi Web built-in sub-agents",
-    "agents.builtInDescription": "Provides Pi Web's integrated Agent tools and disables a conflicting pi-subagents extension.",
+    "agents.builtInDescription":
+      "Provides Pi Web's integrated Agent tools and disables a conflicting pi-subagents extension.",
     "agents.reloadRequired": "Reload the current session to apply this change.",
     "agents.reloadSession": "Reload session",
     "agents.reloading": "Reloading...",
@@ -93,7 +100,8 @@ export const enLocale: LocalePlugin = {
     "agentSwitcher.status.failed": "Failed",
     "agentSwitcher.status.aborted": "Aborted",
     "agentSwitcher.status.interrupted": "Interrupted",
-    "appUpdate.releaseNotes": "Pi Web v{version} is available. View release notes",
+    "appUpdate.releaseNotes":
+      "Pi Web v{version} is available. View release notes",
     "sidebar.hide": "Hide sidebar",
     "sidebar.show": "Show sidebar",
     "theme.light": "Light mode (click for dark)",
@@ -176,7 +184,8 @@ export const enLocale: LocalePlugin = {
     "files.noneOpen": "No file open",
     "layout.resizeSidebar": "Resize sidebar",
     "layout.resizeFilePanel": "Resize file panel",
-    "layout.resizeHint": "Drag to resize. Double-click or press Enter to reset.",
+    "layout.resizeHint":
+      "Drag to resize. Double-click or press Enter to reset.",
     "sidebar.new": "New",
     "sidebar.newSessionTitle": "New session in {path}",
     "sidebar.refresh": "Refresh",
@@ -200,9 +209,11 @@ export const enLocale: LocalePlugin = {
     "sidebar.open": "Open",
     "sidebar.cancel": "Cancel",
     "sidebar.openRepoRoot": "Open repo root",
-    "sidebar.openRepoRootTitle": "Open the repository root to manage worktrees.",
+    "sidebar.openRepoRootTitle":
+      "Open the repository root to manage worktrees.",
     "sidebar.gitRepoRootOnly": "Git repo root only",
-    "sidebar.gitRepoRootOnlyTitle": "Worktrees are available in Git repository roots.",
+    "sidebar.gitRepoRootOnlyTitle":
+      "Worktrees are available in Git repository roots.",
     "sidebar.worktrees": "Worktrees...",
     "sidebar.checkingWorktrees": "Checking worktrees for this directory.",
     "sidebar.filterWorktrees": "Filter worktrees…",
@@ -210,7 +221,8 @@ export const enLocale: LocalePlugin = {
     "sidebar.switchWorktree": "Switch worktree",
     "sidebar.switchWorktreeTitle": "Switch worktree: {path}",
     "sidebar.main": "main",
-    "sidebar.forceRemoveCheckout": "Uncommitted changes. Force remove checkout?",
+    "sidebar.forceRemoveCheckout":
+      "Uncommitted changes. Force remove checkout?",
     "sidebar.force": "Force",
     "sidebar.createWorktreeTitle": "Create a worktree checkout for a branch",
     "sidebar.newWorktree": "New worktree…",
@@ -230,7 +242,8 @@ export const enLocale: LocalePlugin = {
     "sidebar.sessionSearching": "Searching...",
     "sidebar.sessionSearchEmpty": "No matching conversations",
     "sidebar.sessionSearchCount": "{count} matching conversations",
-    "sidebar.sessionSearchPartial": "Search limit reached. Results may be incomplete.",
+    "sidebar.sessionSearchPartial":
+      "Search limit reached. Results may be incomplete.",
     "sidebar.sessionSearchFailed": "Could not search conversations",
     "sidebar.changedFiles": "{count} changed files",
     "sidebar.loading": "Loading...",
@@ -242,12 +255,14 @@ export const enLocale: LocalePlugin = {
     "sidebar.deleteSession": "Delete {title}?",
     "sidebar.rename": "Rename",
     "sidebar.delete": "Delete",
-    "sidebar.deleteWithShiftClick": "Delete (Shift+click to delete without confirmation)",
+    "sidebar.deleteWithShiftClick":
+      "Delete (Shift+click to delete without confirmation)",
     "sidebar.expandSubagents": "Expand subagents",
     "sidebar.collapseSubagents": "Collapse subagents",
     "sidebar.messagesCount": "{count} msgs",
     "sidebar.worktreePath": "Worktree: {path}",
-    "sidebar.removeWorktreeTitle": "Remove worktree checkout {path}; the branch is kept",
+    "sidebar.removeWorktreeTitle":
+      "Remove worktree checkout {path}; the branch is kept",
     "files.modified": "Modified",
     "files.added": "Added",
     "files.deleted": "Deleted",
@@ -267,7 +282,8 @@ export const enLocale: LocalePlugin = {
     "files.noFiles": "No files found",
     "files.explorer": "Explorer",
     "files.changedCount": "{count} files",
-    "files.changeStats": "{count} changed files, {additions} lines added, {deletions} lines deleted",
+    "files.changeStats":
+      "{count} changed files, {additions} lines added, {deletions} lines deleted",
     "files.conflictSummary": "{count} file{countSuffix} already exist: {files}",
     "files.cannotReplace": "Cannot replace: {files}",
     "files.replace": "Replace",
@@ -313,7 +329,8 @@ export const enLocale: LocalePlugin = {
     "chat.close": "Close",
     "chat.queued": "Queued · {count}",
     "chat.recall": "Recall to input",
-    "chat.recallTitle": "Remove all queued messages and put them back into the input box for editing",
+    "chat.recallTitle":
+      "Remove all queued messages and put them back into the input box for editing",
     "chat.retrying": "Retrying ({attempt}/{max})…",
     "chat.loadingCommands": "Loading commands...",
     "chat.slashCommands": "Slash commands · {label}",
@@ -378,7 +395,8 @@ export const enLocale: LocalePlugin = {
     "chat.stopCompaction": "Stop compaction",
     "chat.compactContext": "Compact context",
     "chat.compacting": "Compacting…",
-    "chat.compactingQueued": "Compacting context — {count} message(s) will be sent automatically after",
+    "chat.compactingQueued":
+      "Compacting context — {count} message(s) will be sent automatically after",
     "chat.compact": "Compact",
     "chat.stopAgent": "Stop agent",
     "chat.stop": "Stop",
@@ -408,7 +426,8 @@ export const enLocale: LocalePlugin = {
     "chat.commandClone": "Clone the current branch into a new session",
     "chat.compacted": "Compacted",
     "chat.imageNotSupportedTitle": "Images may not be sent",
-    "chat.imageNotSupportedBody": "The selected model ({model}) does not support image input. The attached images will likely be ignored.",
+    "chat.imageNotSupportedBody":
+      "The selected model ({model}) does not support image input. The attached images will likely be ignored.",
     "chat.tokensSaved": "{saved} saved",
     "chatMinimap.locateAssistant": "Locate assistant message",
     "i18n.close": "Close",
@@ -457,10 +476,14 @@ export const enLocale: LocalePlugin = {
     "trust.trusting": "Trusting...",
     "trust.cancel": "Cancel",
     "trust.dialogTitle": "Trust this project?",
-    "trust.dialogBody": "Project resources can run local code. Trust only projects whose contents you know.",
-    "trust.skillsNotLoaded": "Project skills are not loaded because this project is not trusted.",
-    "trust.pluginsNotLoaded": "Project plugins are not loaded because this project is not trusted.",
-    "trust.projectScopeUnavailable": "Project installs are unavailable while project resources are not loaded.",
+    "trust.dialogBody":
+      "Project resources can run local code. Trust only projects whose contents you know.",
+    "trust.skillsNotLoaded":
+      "Project skills are not loaded because this project is not trusted.",
+    "trust.pluginsNotLoaded":
+      "Project plugins are not loaded because this project is not trusted.",
+    "trust.projectScopeUnavailable":
+      "Project installs are unavailable while project resources are not loaded.",
     "i18n.creatingSession": "Creating new session…",
     "i18n.creating": "Creating…",
     "i18n.subscription": "Subscription",
@@ -530,7 +553,8 @@ export const enLocale: LocalePlugin = {
     "models.notProvided": "Not provided",
     "models.editCosts": "Edit prices",
     "models.finishEditingCosts": "Done",
-    "models.costAllRequired": "Enter a valid non-negative price; blank fields are saved as 0.",
+    "models.costAllRequired":
+      "Enter a valid non-negative price; blank fields are saved as 0.",
     "models.advancedSettings": "Advanced settings",
     "models.providerDefaults": "Using provider defaults",
     "models.headersSummary": "Headers: {count}",
@@ -538,7 +562,8 @@ export const enLocale: LocalePlugin = {
     "models.thinkingSummary": "Thinking levels: {count}",
     "models.apiOverride": "API override",
     "models.headers": "Headers",
-    "models.headersHelp": "Added to this model's requests and overrides provider headers.",
+    "models.headersHelp":
+      "Added to this model's requests and overrides provider headers.",
     "models.compatibility": "Compatibility",
     "models.deepSeekThinkingCompat": "DeepSeek thinking compatibility",
     "models.developerRole": "Use the developer role for the system prompt",
@@ -610,18 +635,21 @@ export const enLocale: LocalePlugin = {
     "i18n.packageEnabled": "Package enabled.",
     "i18n.sessionReloaded": "Session reloaded.",
     "i18n.thinking": "Thinking",
-    "i18n.largeMessageReveal": "Message content is very large ({size}). Click to view as plain text — markdown rendering is disabled to keep the page responsive.",
+    "i18n.largeMessageReveal":
+      "Message content is very large ({size}). Click to view as plain text — markdown rendering is disabled to keep the page responsive.",
     "i18n.loadingThinking": "Loading thinking...",
     "i18n.copyMessage": "Copy message",
     "i18n.editFromHere": "Edit from here",
     "i18n.editFromHereTitle": "Edit from here — branches within this session",
     "i18n.newSession": "New session",
-    "i18n.newSessionTitle": "New session — creates an independent copy from here",
+    "i18n.newSessionTitle":
+      "New session — creates an independent copy from here",
     "i18n.estimatedTokens": "Estimated token count while streaming",
     "i18n.noOutput": "(no output)",
     "i18n.noSummary": "(no summary)",
     "i18n.conversationCompacted": "Conversation compacted",
-    "i18n.compactionDescription": "The conversation history before this point was compacted into the following summary:",
+    "i18n.compactionDescription":
+      "The conversation history before this point was compacted into the following summary:",
     "i18n.fileContext": "File context: {details}",
     "i18n.readFiles": "Read files",
     "i18n.modifiedFiles": "Modified files",

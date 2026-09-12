@@ -34,7 +34,8 @@ export async function GET(req: Request) {
         // /api/agent/running; keeps "awaiting your answer" distinct from
         // "running" in session lists.
         awaitingInputSessionIds: getAwaitingInputRpcSessionIds(),
-        completionNotificationSuppressedSessionIds: getCompletionNotificationSuppressedRpcSessionIds(),
+        completionNotificationSuppressedSessionIds:
+          getCompletionNotificationSuppressedRpcSessionIds(),
       },
       { headers: { "Cache-Control": "no-store" } },
     );
