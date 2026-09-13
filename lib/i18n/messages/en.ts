@@ -417,9 +417,7 @@ export const enLocale: LocalePlugin = {
     "chat.stopCompaction": "Stop compaction",
     "chat.compactContext": "Compact context",
     "chat.compacting": "Compacting…",
-    "chat.compactingQueued":
-      "Compacting context — {count} message(s) will be sent automatically after",
-    "chat.compact": "Compact",
+        "chat.compact": "Compact",
     "chat.stopAgent": "Stop agent",
     "chat.stop": "Stop",
     "agent.extensionTurnStart": "Extension triggered a new run",

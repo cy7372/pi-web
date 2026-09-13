@@ -6,20 +6,12 @@ interface WindowNotificationLike {
 }
 
 interface ServiceWorkerRegistrationLike {
-  showNotification: (
-    title: string,
-    options?: NotificationOptions,
-  ) => Promise<void>;
+  showNotification: (title: string, options?: NotificationOptions) => Promise<void>;
 }
 
 export interface BrowserNotificationEnvironment {
-  createWindowNotification: (
-    title: string,
-    options?: NotificationOptions,
-  ) => WindowNotificationLike;
-  getServiceWorkerRegistration:
-    | (() => Promise<ServiceWorkerRegistrationLike | undefined>)
-    | null;
+  createWindowNotification: (title: string, options?: NotificationOptions) => WindowNotificationLike;
+  getServiceWorkerRegistration: (() => Promise<ServiceWorkerRegistrationLike | undefined>) | null;
 }
 
 export interface BrowserNotificationOptions {
@@ -37,9 +29,7 @@ type DocumentAttentionState = Pick<Document, "visibilityState" | "hasFocus">;
 export function shouldShowBrowserNotification(
   attentionState: DocumentAttentionState = document,
 ): boolean {
-  return (
-    attentionState.visibilityState !== "visible" || !attentionState.hasFocus()
-  );
+  return attentionState.visibilityState !== "visible" || !attentionState.hasFocus();
 }
 
 export function isBlockingExtensionUiRequest(
@@ -65,23 +55,17 @@ export function claimExtensionAttentionNotification(
   request: ExtensionUiRequest,
   notifiedRequestIds: Set<string>,
 ): request is BlockingExtensionUiRequest {
-  if (
-    !isBlockingExtensionUiRequest(request) ||
-    notifiedRequestIds.has(request.id)
-  )
-    return false;
+  if (!isBlockingExtensionUiRequest(request) || notifiedRequestIds.has(request.id)) return false;
   notifiedRequestIds.add(request.id);
   return true;
 }
 
 function getBrowserEnvironment(): BrowserNotificationEnvironment {
   return {
-    createWindowNotification: (title, options) =>
-      new Notification(title, options),
-    getServiceWorkerRegistration:
-      "serviceWorker" in navigator
-        ? () => navigator.serviceWorker.getRegistration()
-        : null,
+    createWindowNotification: (title, options) => new Notification(title, options),
+    getServiceWorkerRegistration: "serviceWorker" in navigator
+      ? () => navigator.serviceWorker.getRegistration()
+      : null,
   };
 }
 
@@ -110,10 +94,7 @@ export async function showBrowserNotification(
   }
 
   try {
-    const notification = environment.createWindowNotification(
-      options.title,
-      notificationOptions,
-    );
+    const notification = environment.createWindowNotification(options.title, notificationOptions);
     notification.onclick = () => {
       notification.close();
       options.onClick();
