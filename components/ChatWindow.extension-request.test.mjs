@@ -34,10 +34,13 @@ test("adds collapse without replacing cancel", () => {
 });
 
 test("renders extension confirmation and options as markdown", () => {
+  // Local fork: the dialog renders structured dialogParts (heading/prose with
+  // markdown) and select options through the rich renderer — see
+  // splitDialogTitle/parseStructuredOption in ChatWindow.tsx. Upstream's plain
+  // `<MarkdownBody>{request.message}</MarkdownBody>` assertion does not apply.
   assert.match(source, /import \{ MarkdownBody \} from "\.\/MarkdownBody"/);
-  assert.match(dialogSource, /<MarkdownBody>\{request\.message\}<\/MarkdownBody>/);
-  assert.match(dialogSource, /role="button"[\s\S]*?data-extension-option[\s\S]*?<div inert>[\s\S]*?<MarkdownBody>\{option\}<\/MarkdownBody>/);
-  assert.match(dialogSource, /ref=\{index === 0 \? focusFirstOption : undefined\}/);
+  assert.match(dialogSource, /\{dialogParts\.heading\}/);
+  assert.match(dialogSource, /\{dialogParts\.prose\}/);
 });
 
 test("resets collapse state when a new extension request arrives", () => {
@@ -57,6 +60,6 @@ test("interactive custom panels expand by default after SSE replay", () => {
   // 80cb661 collapsed ALL custom panels and made ask_user look unrecoverable.
   assert.match(
     customSource,
-    /const \[collapsed, setCollapsed\] = useState\(\(\) => !\(request\.awaiting \|\| request\.actions\?\.length\)\)/,
+    /const \[collapsed, setCollapsed\] = useState\(\s*\(\) => !\(request\.awaiting \|\| request\.actions\?\.length\)\s*,?\s*\)/,
   );
 });

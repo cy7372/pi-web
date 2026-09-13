@@ -400,7 +400,7 @@ test("delegates event stream readiness and hides an empty agent phase", () => {
   );
   assert.match(
     chatWindowSource,
-    /\(agentRunning \|\| isCompacting\) && !hasStreamingContent && \(isCompacting \|\| agentPhase\)/,
+    /\(agentRunning \|\| isCompacting\)\s*&&\s*!hasStreamingContent\s*&&\s*\(isCompacting \|\| agentPhase\)/,
   );
   assert.match(chatWindowSource, /return null;/);
 });

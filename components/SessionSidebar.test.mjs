@@ -124,7 +124,7 @@ test("does not expose disk-backed actions for transient sessions", () => {
 
 test("hides subagent rows and aggregates their state into the main session row", () => {
   assert.match(source, /const sessionFamilies = listSessionFamilies\(filteredSessions\)/);
-  assert.match(source, /familySessions\.some\(\(session\) => session\.id === selectedSessionId\)/);
-  assert.match(source, /familySessions\.some\(\(session\) => runningSessionIds\.has\(session\.id\)\)/);
+  assert.match(source, /familySessions\.some\(\s*\(session\) => session\.id === selectedSessionId\s*,?\s*\)/);
+  assert.match(source, /familySessions\.some\(\(session\) =>\s*runningSessionIds\.has\(session\.id\)\s*,?\s*\)/);
   assert.doesNotMatch(source, /function SessionTreeItem/);
 });
