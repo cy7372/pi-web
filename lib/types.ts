@@ -318,12 +318,13 @@ export interface BranchPreview {
 }
 
 export type SubagentSessionStatus =
-    | "starting"
-    | "running"
-    | "completed"
-    | "failed"
-    | "aborted"
-    | "interrupted";
+  | "starting"
+  | "queued"
+  | "running"
+  | "completed"
+  | "failed"
+  | "aborted"
+  | "interrupted";
 
 export interface SessionTreeNode {
     entry: SessionEntry;

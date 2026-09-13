@@ -3,6 +3,7 @@ import {
   toClientAgentEvent,
   type AgentEventLike,
 } from "./agent-event-wire";
+import { acquireSessionLivenessLease } from "./session-liveness";
 
 export interface AgentEventStreamSession {
   readonly isStreaming: boolean;
@@ -63,6 +64,7 @@ export function createAgentEventStream(
   sessionPromise: Promise<AgentEventStreamSession>,
 ): ReadableStream<Uint8Array> {
   let cancelStream: (closeController: boolean | "error") => void = () => {};
+  let releaseLease: () => void = () => {};
 
   return new ReadableStream<Uint8Array>({
     start(controller) {
@@ -82,6 +84,8 @@ export function createAgentEventStream(
         if (closed) return;
         closed = true;
         activeStreamClosers.delete(cleanup);
+        releaseLease();
+        releaseLease = () => {};
         if (heartbeat !== null) clearInterval(heartbeat);
         unsubscribe?.();
         unsubscribe = null;
@@ -102,6 +106,7 @@ export function createAgentEventStream(
       };
       cancelStream = cleanup;
       activeStreamClosers.add(cleanup);
+      releaseLease = acquireSessionLivenessLease(sessionId).release;
 
       const enqueueText = (text: string) => {
         if (closed) return;

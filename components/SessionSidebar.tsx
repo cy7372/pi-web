@@ -2135,7 +2135,7 @@ export function SessionSidebar({
                             background: "var(--accent)",
                             border: "none",
                             borderRadius: 5,
-                            color: "#fff",
+                            color: "var(--accent-contrast)",
                             fontSize: 11,
                             fontWeight: 600,
                             cursor:
