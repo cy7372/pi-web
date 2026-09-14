@@ -46,6 +46,22 @@ export function closeAllAgentEventStreams(): void {
   }
 }
 
+/**
+ * Register another live SSE stream's closer so process shutdown terminates it
+ * too (same zombie-drain hazard documented on CLOSER_REGISTRY above). Any route
+ * that opens a never-ending stream MUST register here, otherwise Next 16's
+ * server.close() drain hangs on it and Servy leaves an orphan process.
+ * Returns the unregister function; call it from the stream's own cleanup.
+ */
+export function registerAgentEventStreamCloser(
+  close: StreamCloser,
+): () => void {
+  activeStreamClosers.add(close);
+  return () => {
+    activeStreamClosers.delete(close);
+  };
+}
+
 export function activeAgentEventStreamCount(): number {
   return activeStreamClosers.size;
 }

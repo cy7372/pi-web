@@ -10,6 +10,7 @@ import { normalizeToolCalls } from "./normalize";
 import { getThinkingPreview } from "./message-display";
 import { projectIdentityKey } from "./project-identity";
 import { sessionPathKey } from "./session-path";
+import { publishSessionStateChange } from "./session-state-broadcast";
 import { MAX_TOOL_RESULT_IMAGE_BYTES, TOOL_RESULT_IMAGE_MIMES } from "./tool-result-images";
 import { resolveProject, type ProjectInfo } from "./worktree";
 import { readSubagentRun, SUBAGENT_META_TYPE } from "./subagents";
@@ -315,6 +316,10 @@ function findSessionIdByPath(filePath: string): string | undefined {
 export function invalidateSessionListCache(): void {
   globalThis.__piSessionListGeneration = (globalThis.__piSessionListGeneration ?? 0) + 1;
   globalThis.__piSessionListCache = undefined;
+  // 列表结构变了（新会话/改名/删除）—— 这是全仓库统一的「列表已变」信号，
+  // 在此广播可让 SSE 订阅端立即重拉全列表，不必等下一轮兜底轮询。
+  // 无订阅者时该调用第一行即返回，对这 10+ 个调用点零成本。
+  publishSessionStateChange();
 }
 
 export function getSessionListVersion(): number {

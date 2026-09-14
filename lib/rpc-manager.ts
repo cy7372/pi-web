@@ -26,9 +26,14 @@ import {
 import {
   cacheSessionPath,
   getLatestModelChange,
+  getSessionListVersion,
   invalidateSessionListCache,
   resolveSessionPath,
 } from "./session-reader";
+import {
+  publishSessionStateChange,
+  registerSessionStateProvider,
+} from "./session-state-broadcast";
 import {
   getProjectTrustStatus,
   projectTrustReloadOptions,
@@ -738,6 +743,10 @@ export class AgentSessionWrapper {
         );
       }
     }
+    // 这里是所有出站事件的唯一 choke point（agent_start/agent_settled、
+    // extension_ui_request、流式增量均经此），所以会话运行态广播只需挂这一处
+    // 就能覆盖绝大部分状态转变。无订阅者时立即返回，快照未变时不推送。
+    publishSessionStateChange();
   }
 
   private async acquirePromptAdmission(): Promise<() => void> {
@@ -946,6 +955,8 @@ export class AgentSessionWrapper {
             };
 
             this.pendingPromptCount += 1;
+            // 提交即视为运行中：不等 agent_start 事件回来，列表页黄点立刻亮。
+            publishSessionStateChange();
             let prompt: Promise<void>;
             try {
               prompt = this.inner.prompt(command.message as string, {
@@ -2816,3 +2827,12 @@ export async function startRpcSession(
   locks.set(sessionId, starting);
   return starting;
 }
+
+// ── 会话运行态广播：注册快照数据源 ──────────────────────────────────────────
+// 放在模块末尾（函数声明已提升，此处引用安全）。广播器不 import 本模块以避免
+// 循环依赖；它只在存在 SSE 订阅者时才回调这里，空闲时零开销。
+registerSessionStateProvider(() => ({
+  running: getRunningRpcSessionIds(),
+  awaiting: getAwaitingInputRpcSessionIds(),
+  sessionListVersion: getSessionListVersion(),
+}));
