@@ -3,22 +3,13 @@
   "version": "0.9.1",
   "private": true,
   "workspaces": [
-    "apps/*",
-    "packages/*"
+    "apps/web",
+    "packages/shared"
   ],
   "scripts": {
     "preinstall": "node -e \"const raw=process.env.npm_execpath; const base=raw?raw.toLowerCase().split(String.fromCharCode(92)).pop().split('/').pop():''; if(raw && base!=='bun' && base!=='bun.exe' && base!=='bunx') { console.error('[pi-web] wrong package manager: '+base+' ('+raw+') - this repo uses bun. Run: bun install'); process.exit(1) }\"",
-    "postinstall": "node apps/api/bin/prepare-terminal.js",
-    "dev": "node deploy/dev.mjs -H 127.0.0.1 -p 30141",
-    "dev:lan": "node deploy/dev.mjs -H 0.0.0.0 -p 30141",
-    "build": "node deploy/build.mjs",
-    "start": "bun run --cwd apps/api start",
-    "start:lan": "bun run --cwd apps/api start:lan",
-    "lint": "bun run --cwd apps/api lint",
-    "test": "bun run --cwd apps/api test",
-    "test:terminal": "bun run --cwd apps/api test:terminal",
-    "test:e2e": "bun run --cwd apps/api test:e2e",
     "build:web": "bun run --cwd apps/web build",
-    "dev:web": "bun run --cwd apps/web dev"
+    "dev:web": "bun run --cwd apps/web dev",
+    "test": "node --experimental-strip-types --test \"packages/shared/src/**/*.test.mjs\""
   }
 }

@@ -3,7 +3,7 @@ import { readFile } from "node:fs/promises";
 import test from "node:test";
 
 const source = await readFile(new URL("./AgentsConfig.tsx", import.meta.url), "utf8");
-const cssSource = await readFile(new URL("../app/settings.css", import.meta.url), "utf8");
+const cssSource = await readFile(new URL("../styles/settings.css", import.meta.url), "utf8");
 const chatInputSource = await readFile(new URL("./ChatInput.tsx", import.meta.url), "utf8");
 const modelSelectorSource = await readFile(new URL("./ModelSelector.tsx", import.meta.url), "utf8");
 

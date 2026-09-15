@@ -2,9 +2,9 @@ import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 import test from "node:test";
 
-const layoutSource = await readFile(new URL("../app/layout.tsx", import.meta.url), "utf8");
-const settingsCssSource = await readFile(new URL("../app/settings.css", import.meta.url), "utf8");
-const cssSource = await readFile(new URL("../app/globals.css", import.meta.url), "utf8");
+const layoutSource = await readFile(new URL("../app-src/layout.tsx", import.meta.url), "utf8");
+const settingsCssSource = await readFile(new URL("../styles/settings.css", import.meta.url), "utf8");
+const cssSource = await readFile(new URL("../styles/app.css", import.meta.url), "utf8");
 const appShellSource = await readFile(new URL("./AppShell.tsx", import.meta.url), "utf8");
 const chatWindowSource = await readFile(new URL("./ChatWindow.tsx", import.meta.url), "utf8");
 const chatInputSource = await readFile(new URL("./ChatInput.tsx", import.meta.url), "utf8");

@@ -6,7 +6,7 @@ import { createJiti } from "jiti";
 const chatWindow = await readFile(new URL("./ChatWindow.tsx", import.meta.url), "utf8");
 const chatInput = await readFile(new URL("./ChatInput.tsx", import.meta.url), "utf8");
 const settingsPanel = await readFile(new URL("./SettingsPanel.tsx", import.meta.url), "utf8");
-const globals = await readFile(new URL("../app/globals.css", import.meta.url), "utf8");
+const globals = await readFile(new URL("../styles/app.css", import.meta.url), "utf8");
 const chatAppearanceHook = await readFile(new URL("../hooks/useChatAppearance.ts", import.meta.url), "utf8");
 const jiti = createJiti(import.meta.url);
 const { clampChatContentWidth, clampChatContentFontSize } = await jiti.import("../hooks/useChatAppearance.ts");

@@ -3,9 +3,9 @@ import { readFile } from "node:fs/promises";
 import test from "node:test";
 
 const templateSource = await readFile(new URL("./SettingsUi.tsx", import.meta.url), "utf8");
-const cssSource = await readFile(new URL("../app/settings.css", import.meta.url), "utf8");
-const globalCssSource = await readFile(new URL("../app/globals.css", import.meta.url), "utf8");
-const layoutSource = await readFile(new URL("../app/layout.tsx", import.meta.url), "utf8");
+const cssSource = await readFile(new URL("../styles/settings.css", import.meta.url), "utf8");
+const globalCssSource = await readFile(new URL("../styles/app.css", import.meta.url), "utf8");
+const layoutSource = await readFile(new URL("../app-src/layout.tsx", import.meta.url), "utf8");
 const enSource = await readFile(new URL("../lib/i18n/messages/en.ts", import.meta.url), "utf8");
 const zhSource = await readFile(new URL("../lib/i18n/messages/zh-CN.ts", import.meta.url), "utf8");
 const configSources = await Promise.all(
@@ -49,7 +49,7 @@ test("provides one template for config layout and controls", () => {
 });
 
 test("loads settings presentation from its dedicated stylesheet", () => {
-  assert.match(layoutSource, /import "\.\/globals\.css";\s*import "\.\/settings\.css";/);
+  assert.match(layoutSource, /import "@\/styles\/app\.css";\s*import "@\/styles\/settings\.css";/);
   assert.match(cssSource, /\.config-panel-root \{/);
   assert.match(cssSource, /\.settings-dialog-backdrop \{/);
   assert.doesNotMatch(globalCssSource, /\.config-panel-root \{/);

@@ -3,15 +3,15 @@ import { readFile } from "node:fs/promises";
 import test from "node:test";
 
 const panelSource = await readFile(new URL("./SettingsPanel.tsx", import.meta.url), "utf8");
-const cssSource = await readFile(new URL("../app/settings.css", import.meta.url), "utf8");
-const globalCssSource = await readFile(new URL("../app/globals.css", import.meta.url), "utf8");
+const cssSource = await readFile(new URL("../styles/settings.css", import.meta.url), "utf8");
+const globalCssSource = await readFile(new URL("../styles/app.css", import.meta.url), "utf8");
 const shellSource = await readFile(new URL("./AppShell.tsx", import.meta.url), "utf8");
 const sidebarSource = await readFile(new URL("./SessionSidebar.tsx", import.meta.url), "utf8");
 const themeSource = await readFile(new URL("../hooks/useTheme.ts", import.meta.url), "utf8");
 const themeOptionsSource = await readFile(new URL("../lib/theme.ts", import.meta.url), "utf8");
 const enSource = await readFile(new URL("../lib/i18n/messages/en.ts", import.meta.url), "utf8");
 const zhSource = await readFile(new URL("../lib/i18n/messages/zh-CN.ts", import.meta.url), "utf8");
-const loginSource = await readFile(new URL("../app/login/page.tsx", import.meta.url), "utf8");
+const loginSource = await readFile(new URL("../app-src/login/page.tsx", import.meta.url), "utf8");
 
 test("opens one settings panel from direct sidebar shortcuts", () => {
   assert.match(shellSource, /<SettingsPanel/);

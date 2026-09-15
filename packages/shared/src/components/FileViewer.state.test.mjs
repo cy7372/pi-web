@@ -6,7 +6,7 @@ import { renderToStaticMarkup } from "react-dom/server";
 import reactSyntaxHighlighter from "react-syntax-highlighter";
 
 const source = await readFile(new URL("./FileViewer.tsx", import.meta.url), "utf8");
-const cssSource = await readFile(new URL("../app/globals.css", import.meta.url), "utf8");
+const cssSource = await readFile(new URL("../styles/app.css", import.meta.url), "utf8");
 const { Prism: SyntaxHighlighter } = reactSyntaxHighlighter;
 
 function functionBlock(name, nextName) {

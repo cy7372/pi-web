@@ -3,7 +3,7 @@ import { readFile } from "node:fs/promises";
 import test from "node:test";
 
 const source = await readFile(new URL("./ImagePreview.tsx", import.meta.url), "utf8");
-const cssSource = await readFile(new URL("../app/globals.css", import.meta.url), "utf8");
+const cssSource = await readFile(new URL("../styles/app.css", import.meta.url), "utf8");
 
 test("uses a native modal dialog and restores focus to its trigger", () => {
   assert.match(source, /useRef<HTMLDialogElement>\(null\)/);
