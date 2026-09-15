@@ -182,3 +182,30 @@ reverting code:
   material. The "another machine" upside ADR 0004 noted for alternative C
   (remote compute) now has a cleaner path: the daemon's loopback transport
   is the seam a future remote link would replace.
+
+## Upstream tracking after the repo split (2026-09-15, user decision)
+
+Question: after `apps/api` is extracted into pi-server via git filter-repo,
+can the server side still track upstream (agegr/pi-web)?
+
+Decision: **A/C — filter-repo extraction + pi-web stays the upstream
+integration point.** pi-server hard-forks with our rewritten history;
+upstream updates keep landing in pi-web first (it retains full shared
+ancestry, so merges stay cheapest there), and server-relevant deltas
+(app/api/**, server-side lib changes) are manually ported into pi-server.
+
+Rationale:
+- filter-repo rewrites every commit hash, so git-merge against upstream is
+  structurally dead in pi-server regardless of anything else.
+- ~85% of upstream churn is frontend (components/hooks) — it belongs to
+  pi-web anyway and keeps normal mergeability there.
+- The server side is our deepest-customized layer (proxy password gate,
+  request-security, state-stream, worktree, Servy deployment); even a
+  fork-based layout would still need per-merge manual reconciliation.
+- The hardest server-side coupling is the pi SDK version, which travels
+  through package.json dependency bumps, not git history.
+
+Rejected alternative: pi-server = fresh fork of upstream + one-time
+delta transplant (preserves git-merge, but locks pi-server to the
+upstream layout and the transplant is large; mergeability buys little
+under this level of divergence).
