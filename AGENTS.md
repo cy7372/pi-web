@@ -1,5 +1,17 @@
 # Pi Web - Development Notes
 
+## Repo layout (2026-09-15, ADR 0005 Phase 0)
+
+This repo is now a **bun workspaces monorepo**: the Next.js app lives in
+**`apps/api/`** — every path below (`app/`, `lib/`, `components/`, `hooks/`,
+`bin/`, `deploy`-referenced configs) means `apps/api/<path>` since Phase 0.
+Root `package.json` scripts delegate (`bun run dev/build/start` still work
+from the repo root). `apps/web` (static export) and `apps/agent` (daemon)
+are stubs arriving in Phase 1/2; `packages/shared` will hold cross-app
+code. Deploy scripts still live in `deploy/` at the root. Next resolves
+hoisted deps through the `apps/api/node_modules` junction (absolute,
+points at the root store) — recreate it after cloning.
+
 ## Quick Start
 
 ```bash

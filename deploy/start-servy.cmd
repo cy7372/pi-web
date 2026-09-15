@@ -16,8 +16,8 @@ REM  start would only log a vague no-build-id error; make the
 REM  failure loud and the fix obvious in Servy event log.
 setlocal
 cd /d "D:\Programs\pi-web"
-if not exist ".next\BUILD_ID" (
-    >&2 echo [PiWeb] FATAL: production build missing - no .next\BUILD_ID. Rebuild with: deploy\deploy.cmd
+if not exist "apps\api\.next\BUILD_ID" (
+    >&2 echo [PiWeb] FATAL: production build missing - no apps\api\.next\BUILD_ID. Rebuild with: deploy\deploy.cmd
     exit /b 1
 )
 set "NO_PROXY=localhost,127.0.0.1"
@@ -40,5 +40,5 @@ if not exist "%BUN_EXE%" (
     >&2 echo [PiWeb] FATAL: bun.exe missing at %BUN_EXE%. Restore from nvm\*\node_modules\bun\bin\bun.exe.
     exit /b 1
 )
-"%BUN_EXE%" run start
+"%BUN_EXE%" run --cwd "apps\api" start
 endlocal & exit /b %errorlevel%

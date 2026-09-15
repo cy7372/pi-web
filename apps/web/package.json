@@ -1,0 +1,8 @@
+{
+  "name": "@agegr/pi-web-web",
+  "version": "0.9.1",
+  "private": true,
+  "scripts": {
+    "build": "echo '[pi-web] apps/web: static export arrives in Phase 1 (docs/adr/0005-frontend-agent-split.md)' && exit 0"
+  }
+}

@@ -1,18 +1,24 @@
 import type { NextConfig } from "next";
 import { readFileSync } from "fs";
-import { dirname, join } from "path";
+import { dirname, join, resolve } from "path";
 import { fileURLToPath } from "url";
 
 const configDir = dirname(fileURLToPath(import.meta.url));
-const { version } = JSON.parse(readFileSync(join(configDir, "package.json"), "utf8")) as { version: string };
+let version = "0.0.0";
+try {
+  version = (JSON.parse(readFileSync(join(configDir, "package.json"), "utf8")) as { version: string }).version;
+} catch { /* fall back to a placeholder; NEXT_PUBLIC_APP_VERSION is cosmetic */ }
 let piVersion = "unknown";
 try {
-  const piPkgPath = join(configDir, "node_modules/@earendil-works/pi-coding-agent/package.json");
+  // bun workspaces hoist deps to the repo root's node_modules
+  const piPkgPath = join(configDir, "../../node_modules/@earendil-works/pi-coding-agent/package.json");
   piVersion = (JSON.parse(readFileSync(piPkgPath, "utf8")) as { version: string }).version;
 } catch { /* package not found, use default */ }
 
 const nextConfig: NextConfig = {
-  outputFileTracingRoot: configDir,
+  // monorepo (ADR 0005): deps are hoisted to the workspace root, so tracing
+  // must walk from the repo root, not from apps/api
+  outputFileTracingRoot: resolve(configDir, "../.."),
   // 2026-09-04: separate dev output from the production .next. Sharing one
   // dir let `next dev` clobber the Servy-served production build (and vice
   // versa: a production build breaks a running dev server). start-servy.cmd

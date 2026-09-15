@@ -16,6 +16,7 @@ import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), "..");
+const appDir = resolve(root, "apps/api");
 const buildHome = resolve(root, ".build-home");
 mkdirSync(buildHome, { recursive: true });
 
@@ -25,7 +26,7 @@ const nextBin = resolve(root, "node_modules", "next", "dist", "bin", "next");
 console.log(`[build] isolated HOME -> ${buildHome}`);
 const result = spawnSync(process.execPath, [nextBin, "build", "--webpack"], {
   stdio: "inherit",
-  cwd: root,
+  cwd: appDir,
   env,
 });
 process.exit(result.status ?? 1);

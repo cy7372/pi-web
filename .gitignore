@@ -1,7 +1,7 @@
 # See https://help.github.com/articles/ignoring-files/ for more about ignoring files.
 
-# dependencies
-/node_modules
+# dependencies (any workspace depth — bun hoists to root, conflicts stay local)
+node_modules/
 /.pnp
 .pnp.*
 .yarn/*
@@ -11,16 +11,16 @@
 !.yarn/versions
 
 # testing
-/coverage
-/test-results/
+coverage/
+test-results/
 
-# next.js
-/.next/
-/.next-dev/
-/out/
+# next.js (any workspace depth; apps/api is the Next app now)
+.next/
+.next-dev/
+out/
 
 # production
-/build
+build/
 
 # misc
 .DS_Store
