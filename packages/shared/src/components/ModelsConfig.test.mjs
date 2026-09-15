@@ -13,17 +13,35 @@ const {
   updateHeaderRow,
 } = await jiti.import("./models-config-helpers.ts");
 
-const source = await readFile(new URL("./ModelsConfig.tsx", import.meta.url), "utf8");
-const cssSource = await readFile(new URL("../styles/settings.css", import.meta.url), "utf8");
+const source = await readFile(
+  new URL("./ModelsConfig.tsx", import.meta.url),
+  "utf8",
+);
+const cssSource = await readFile(
+  new URL("../styles/settings.css", import.meta.url),
+  "utf8",
+);
 
 test("uses shared sidebar sizing for providers and matching indented model rows", () => {
-  const sidebar = source.slice(source.indexOf("<ConfigSidebar>"), source.indexOf("</ConfigSidebar>"));
+  const sidebar = source.slice(
+    source.indexOf("<ConfigSidebar>"),
+    source.indexOf("</ConfigSidebar>"),
+  );
 
   assert.match(sidebar, /<ConfigSidebarItem[\s\S]*?active=\{isSelected\}/);
-  assert.match(sidebar, /<ConfigSidebarItem[\s\S]*?active=\{isProviderSelected\}/);
+  assert.match(
+    sidebar,
+    /<ConfigSidebarItem[\s\S]*?active=\{isProviderSelected\}/,
+  );
   assert.match(sidebar, /className="models-sidebar-indented-item"/);
-  assert.match(sidebar, /className="models-sidebar-indented-item models-sidebar-add-item"/);
-  assert.match(cssSource, /\.models-sidebar-indented-item \{[\s\S]*?padding-left: 26px/);
+  assert.match(
+    sidebar,
+    /className="models-sidebar-indented-item models-sidebar-add-item"/,
+  );
+  assert.match(
+    cssSource,
+    /\.models-sidebar-indented-item \{[\s\S]*?padding-left: 26px/,
+  );
 });
 
 test("ignores malformed auth provider responses", () => {
@@ -55,13 +73,20 @@ test("custom model config exposes model headers and supportsDeveloperRole compat
   // Model-level compat toggle reads the effective (provider+model) value so
   // hand-edited models.json settings are reflected, while writes stay on the
   // model entry as an explicit per-model override.
-  assert.match(source, /effectiveCompat\(provider, model\)\["supportsDeveloperRole"\] !== false/);
+  assert.match(
+    source,
+    /effectiveCompat\(provider, model\)\["supportsDeveloperRole"\] !== false/,
+  );
   assert.match(source, /setCompatBool\(model, "supportsDeveloperRole", v\)/);
 });
 
 test("disabling the developer role writes an explicit false override", () => {
   assert.deepEqual(
-    setCompatBool({ compat: { supportsStore: true } }, "supportsDeveloperRole", false),
+    setCompatBool(
+      { compat: { supportsStore: true } },
+      "supportsDeveloperRole",
+      false,
+    ),
     { compat: { supportsStore: true, supportsDeveloperRole: false } },
   );
 });
@@ -73,10 +98,13 @@ test("editing a header preserves row order and stable identities", () => {
   ];
   const updated = updateHeaderRow(rows, 10, { name: "X-First-Edited" });
 
-  assert.deepEqual(updated.map(({ id, name }) => ({ id, name })), [
-    { id: 10, name: "X-First-Edited" },
-    { id: 11, name: "X-Second" },
-  ]);
+  assert.deepEqual(
+    updated.map(({ id, name }) => ({ id, name })),
+    [
+      { id: 10, name: "X-First-Edited" },
+      { id: 11, name: "X-Second" },
+    ],
+  );
   assert.deepEqual(serializeHeaderRows(updated), {
     "X-First-Edited": "one",
     "X-Second": "two",
@@ -109,21 +137,38 @@ test("model cost drafts default blank prices to zero unless all are blank", () =
     cacheRead: 0.125,
     cacheWrite: 0,
   });
-  assert.deepEqual(parseCompleteModelCost({ ...complete, input: "", cacheWrite: "" }), {
-    input: 0,
-    output: 10,
-    cacheRead: 0.125,
-    cacheWrite: 0,
-  });
-  assert.deepEqual(parseCompleteModelCost({ input: "1.25", output: "", cacheRead: "", cacheWrite: "" }), {
-    input: 1.25,
-    output: 0,
-    cacheRead: 0,
-    cacheWrite: 0,
-  });
+  assert.deepEqual(
+    parseCompleteModelCost({ ...complete, input: "", cacheWrite: "" }),
+    {
+      input: 0,
+      output: 10,
+      cacheRead: 0.125,
+      cacheWrite: 0,
+    },
+  );
+  assert.deepEqual(
+    parseCompleteModelCost({
+      input: "1.25",
+      output: "",
+      cacheRead: "",
+      cacheWrite: "",
+    }),
+    {
+      input: 1.25,
+      output: 0,
+      cacheRead: 0,
+      cacheWrite: 0,
+    },
+  );
   assert.equal(parseCompleteModelCost(modelCostToDraft()), undefined);
-  assert.equal(parseCompleteModelCost({ ...complete, output: "not-a-price" }), undefined);
-  assert.equal(parseCompleteModelCost({ ...complete, output: "-1" }), undefined);
+  assert.equal(
+    parseCompleteModelCost({ ...complete, output: "not-a-price" }),
+    undefined,
+  );
+  assert.equal(
+    parseCompleteModelCost({ ...complete, output: "-1" }),
+    undefined,
+  );
   assert.equal(hasModelCostDraftValue(modelCostToDraft()), false);
   assert.equal(hasModelCostDraftValue({ ...complete, cacheWrite: "" }), true);
 });
@@ -134,10 +179,16 @@ test("manual price editing commits completed costs and removes only an all-blank
     source.indexOf("// ── OAuth detail"),
   );
 
-  assert.match(modelDetail, /const completeCost = parseCompleteModelCost\(nextDraft\)/);
+  assert.match(
+    modelDetail,
+    /const completeCost = parseCompleteModelCost\(nextDraft\)/,
+  );
   assert.match(modelDetail, /if \(completeCost\)/);
   assert.match(modelDetail, /delete nextModel\.cost/);
-  assert.match(modelDetail, /const nextDraft = \{ \.\.\.costDraftRef\.current, \[key\]: value \}/);
+  assert.match(
+    modelDetail,
+    /const nextDraft = \{ \.\.\.costDraftRef\.current, \[key\]: value \}/,
+  );
   assert.match(modelDetail, /costDraftRef\.current = nextDraft/);
   assert.match(modelDetail, /costTemplateRef\.current/);
   assert.match(modelDetail, /value=\{costDraft\[key\]\}/);

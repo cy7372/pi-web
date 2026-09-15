@@ -48,9 +48,14 @@ test("preserves status line breaks while normalizing horizontal whitespace", () 
 });
 
 test("preserves explicit status lines without wrapping and scrolls long or tall output", async () => {
-  const css = await readFile(new URL("../styles/app.css", import.meta.url), "utf8");
-  const statusLineRule = css.match(/\.extension-status-line\s*\{([^}]*)\}/)?.[1] ?? "";
-  const statusTextRule = css.match(/\.extension-status-text\s*\{([^}]*)\}/)?.[1] ?? "";
+  const css = await readFile(
+    new URL("../styles/app.css", import.meta.url),
+    "utf8",
+  );
+  const statusLineRule =
+    css.match(/\.extension-status-line\s*\{([^}]*)\}/)?.[1] ?? "";
+  const statusTextRule =
+    css.match(/\.extension-status-text\s*\{([^}]*)\}/)?.[1] ?? "";
 
   assert.match(statusLineRule, /max-height:/);
   assert.match(statusLineRule, /align-items:\s*flex-start/);
@@ -81,11 +86,13 @@ test("renders a single status line without identifier keys", () => {
 test("renders widgets and status text in one footer", () => {
   const html = renderStatusBar({
     statuses: [{ key: "status", text: "connected" }],
-    widgets: [{
-      key: "usage",
-      lines: ["42%"],
-      placement: "aboveEditor",
-    }],
+    widgets: [
+      {
+        key: "usage",
+        lines: ["42%"],
+        placement: "aboveEditor",
+      },
+    ],
   });
 
   assert.match(html, /extension-status-shelf has-widgets has-status/);

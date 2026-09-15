@@ -2,33 +2,80 @@ import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 import test from "node:test";
 
-const panelSource = await readFile(new URL("./SettingsPanel.tsx", import.meta.url), "utf8");
-const cssSource = await readFile(new URL("../styles/settings.css", import.meta.url), "utf8");
-const globalCssSource = await readFile(new URL("../styles/app.css", import.meta.url), "utf8");
-const shellSource = await readFile(new URL("./AppShell.tsx", import.meta.url), "utf8");
-const sidebarSource = await readFile(new URL("./SessionSidebar.tsx", import.meta.url), "utf8");
-const themeSource = await readFile(new URL("../hooks/useTheme.ts", import.meta.url), "utf8");
-const themeOptionsSource = await readFile(new URL("../lib/theme.ts", import.meta.url), "utf8");
-const enSource = await readFile(new URL("../lib/i18n/messages/en.ts", import.meta.url), "utf8");
-const zhSource = await readFile(new URL("../lib/i18n/messages/zh-CN.ts", import.meta.url), "utf8");
-const loginSource = await readFile(new URL("../app-src/login/page.tsx", import.meta.url), "utf8");
+const panelSource = await readFile(
+  new URL("./SettingsPanel.tsx", import.meta.url),
+  "utf8",
+);
+const cssSource = await readFile(
+  new URL("../styles/settings.css", import.meta.url),
+  "utf8",
+);
+const globalCssSource = await readFile(
+  new URL("../styles/app.css", import.meta.url),
+  "utf8",
+);
+const shellSource = await readFile(
+  new URL("./AppShell.tsx", import.meta.url),
+  "utf8",
+);
+const sidebarSource = await readFile(
+  new URL("./SessionSidebar.tsx", import.meta.url),
+  "utf8",
+);
+const themeSource = await readFile(
+  new URL("../hooks/useTheme.ts", import.meta.url),
+  "utf8",
+);
+const themeOptionsSource = await readFile(
+  new URL("../lib/theme.ts", import.meta.url),
+  "utf8",
+);
+const enSource = await readFile(
+  new URL("../lib/i18n/messages/en.ts", import.meta.url),
+  "utf8",
+);
+const zhSource = await readFile(
+  new URL("../lib/i18n/messages/zh-CN.ts", import.meta.url),
+  "utf8",
+);
+const loginSource = await readFile(
+  new URL("../app-src/login/page.tsx", import.meta.url),
+  "utf8",
+);
 
 test("opens one settings panel from direct sidebar shortcuts", () => {
   assert.match(shellSource, /<SettingsPanel/);
   assert.match(shellSource, /setSettingsSection\(section\)/);
   assert.match(shellSource, /initialSection=\{settingsSection\}/);
   assert.match(shellSource, /translate\("common\.settings"\)/);
-  assert.match(shellSource, /<SettingsSectionIcon section=\{section\} size=\{14\} strokeWidth=\{2\} \/>\s*<span>\{label\}<\/span>/);
-  assert.match(shellSource, /<SettingsSectionIcon section="general" size=\{14\} strokeWidth=\{2\} \/>/);
-  assert.doesNotMatch(shellSource, /\["plugins", translate\("common\.plugins"\)\]/);
-  assert.doesNotMatch(shellSource, /setModelsConfigOpen|setSkillsConfigOpen|setAgentsConfigOpen|setPluginsConfigOpen/);
+  assert.match(
+    shellSource,
+    /<SettingsSectionIcon section=\{section\} size=\{14\} strokeWidth=\{2\} \/>\s*<span>\{label\}<\/span>/,
+  );
+  assert.match(
+    shellSource,
+    /<SettingsSectionIcon section="general" size=\{14\} strokeWidth=\{2\} \/>/,
+  );
+  assert.doesNotMatch(
+    shellSource,
+    /\["plugins", translate\("common\.plugins"\)\]/,
+  );
+  assert.doesNotMatch(
+    shellSource,
+    /setModelsConfigOpen|setSkillsConfigOpen|setAgentsConfigOpen|setPluginsConfigOpen/,
+  );
 });
 
 test("keeps every requested configuration surface inside the settings panel", () => {
   for (const section of ["general", "models", "skills", "agents", "plugins"]) {
     assert.match(panelSource, new RegExp(`id: "${section}"`));
   }
-  for (const component of ["ModelsConfig", "SkillsConfig", "AgentsConfig", "PluginsConfig"]) {
+  for (const component of [
+    "ModelsConfig",
+    "SkillsConfig",
+    "AgentsConfig",
+    "PluginsConfig",
+  ]) {
     assert.match(panelSource, new RegExp(`<${component} embedded`));
   }
 });
@@ -37,7 +84,12 @@ test("restores the settings section and each list detail selection", async () =>
   assert.match(shellSource, /getLastSettingsSection\(projectTrustCwd\)/);
   assert.match(panelSource, /setLastSettingsSection\(initialSection\)/);
   assert.match(panelSource, /setLastSettingsSection\(nextSection\)/);
-  for (const name of ["ModelsConfig", "SkillsConfig", "AgentsConfig", "PluginsConfig"]) {
+  for (const name of [
+    "ModelsConfig",
+    "SkillsConfig",
+    "AgentsConfig",
+    "PluginsConfig",
+  ]) {
     assert.match(
       await readFile(new URL(`./${name}.tsx`, import.meta.url), "utf8"),
       /getLastSettingsSelection/,
@@ -46,11 +98,17 @@ test("restores the settings section and each list detail selection", async () =>
 });
 
 test("keeps visited settings sections mounted and contains nested Escape handling", async () => {
-  const modelsSource = await readFile(new URL("./ModelsConfig.tsx", import.meta.url), "utf8");
+  const modelsSource = await readFile(
+    new URL("./ModelsConfig.tsx", import.meta.url),
+    "utf8",
+  );
   assert.match(panelSource, /mountedSections\.has\(id\)/);
   assert.match(panelSource, /hidden=\{section !== id\}/);
   assert.match(panelSource, /event\.defaultPrevented/);
-  assert.match(modelsSource, /e\.preventDefault\(\);\s*e\.stopPropagation\(\);\s*onClose\(\);/);
+  assert.match(
+    modelsSource,
+    /e\.preventDefault\(\);\s*e\.stopPropagation\(\);\s*onClose\(\);/,
+  );
 });
 
 test("offers five palettes and system theme selection with native radios", () => {
@@ -81,21 +139,36 @@ test("groups chat display controls together without row backgrounds", () => {
 
   assert.doesNotMatch(appearanceSection, /settings-chat-content/);
   assert.match(chatSection, /className="settings-chat-options"/);
-  assert.equal((chatSection.match(/className="settings-chat-option(?: |")/g) ?? []).length, 4);
+  assert.equal(
+    (chatSection.match(/className="settings-chat-option(?: |")/g) ?? []).length,
+    4,
+  );
   assert.equal((chatSection.match(/<ConfigSwitch/g) ?? []).length, 2);
-  for (const key of ["thinkingExpandedDefault", "chatContentWidth", "chatContentFontSize", "quoteSelection"]) {
+  for (const key of [
+    "thinkingExpandedDefault",
+    "chatContentWidth",
+    "chatContentFontSize",
+    "quoteSelection",
+  ]) {
     assert.match(chatSection, new RegExp(`t\\("settings\\.${key}"\\)`));
   }
   assert.doesNotMatch(panelSource, /ThinkingIcon|settings-thinking-/);
-  const chatOptionStyles = cssSource.match(/\.settings-chat-option \{[\s\S]*?\}/)?.[0] ?? "";
+  const chatOptionStyles =
+    cssSource.match(/\.settings-chat-option \{[\s\S]*?\}/)?.[0] ?? "";
   assert.match(chatOptionStyles, /font-size: 12px/);
   assert.doesNotMatch(chatOptionStyles, /background/);
 });
 
 test("keeps General free of divider rows", () => {
   assert.match(panelSource, /className="settings-dialog-header"/);
-  assert.match(cssSource, /\.settings-dialog-header \{[\s\S]*?display: flex[\s\S]*?align-items: center[\s\S]*?min-height: 50px/);
-  assert.doesNotMatch(panelSource, /sections\.find\(\(item\) => item\.id === section\)/);
+  assert.match(
+    cssSource,
+    /\.settings-dialog-header \{[\s\S]*?display: flex[\s\S]*?align-items: center[\s\S]*?min-height: 50px/,
+  );
+  assert.doesNotMatch(
+    panelSource,
+    /sections\.find\(\(item\) => item\.id === section\)/,
+  );
   assert.doesNotMatch(panelSource, /<section style=\{\{[^}]*borderBottom/);
   assert.doesNotMatch(panelSource, /borderLeft: index > 0/);
 });
@@ -106,12 +179,30 @@ test("uses top navigation on desktop and one compact section picker on mobile", 
   assert.match(panelSource, /className="settings-section-tab"/);
   assert.match(cssSource, /\.settings-section-tab \{[\s\S]*?width: 96px/);
   assert.match(cssSource, /\.settings-section-icon \{[\s\S]*?flex-shrink: 0/);
-  assert.match(cssSource, /\.settings-section-tab::after \{[\s\S]*?width: 24px/);
-  assert.match(cssSource, /\.settings-section-tab\[aria-current="page"\]::after/);
-  assert.match(cssSource, /\.settings-section-tab:focus-visible:not\(\[aria-current="page"\]\)/);
-  assert.match(cssSource, /\.settings-section-tab:focus-visible\[aria-current="page"\][\s\S]*?outline: none/);
-  assert.match(cssSource, /@media \(max-width: 640px\)[\s\S]*?\.settings-section-tabs \{[\s\S]*?display: none/);
-  assert.match(cssSource, /@media \(max-width: 640px\)[\s\S]*?\.settings-mobile-section-picker \{[\s\S]*?display: block/);
+  assert.match(
+    cssSource,
+    /\.settings-section-tab::after \{[\s\S]*?width: 24px/,
+  );
+  assert.match(
+    cssSource,
+    /\.settings-section-tab\[aria-current="page"\]::after/,
+  );
+  assert.match(
+    cssSource,
+    /\.settings-section-tab:focus-visible:not\(\[aria-current="page"\]\)/,
+  );
+  assert.match(
+    cssSource,
+    /\.settings-section-tab:focus-visible\[aria-current="page"\][\s\S]*?outline: none/,
+  );
+  assert.match(
+    cssSource,
+    /@media \(max-width: 640px\)[\s\S]*?\.settings-section-tabs \{[\s\S]*?display: none/,
+  );
+  assert.match(
+    cssSource,
+    /@media \(max-width: 640px\)[\s\S]*?\.settings-mobile-section-picker \{[\s\S]*?display: block/,
+  );
   assert.doesNotMatch(panelSource, /width: isMobile \? "100%" : 188/);
   assert.match(panelSource, /<main className="settings-dialog-main">/);
   assert.doesNotMatch(panelSource, /<style>/);
@@ -126,15 +217,25 @@ test("labels agent profiles as sub-agents", () => {
 });
 
 test("uses the child-session robot glyph for the sub-agents tab", () => {
-  const robotGlyph = /<rect x="5" y="7" width="14" height="11" rx="2" \/>\s*<path d="M9 11h\.01M15 11h\.01M9 15h6M12 7V4M10 4h4" \/>/;
+  const robotGlyph =
+    /<rect x="5" y="7" width="14" height="11" rx="2" \/>\s*<path d="M9 11h\.01M15 11h\.01M9 15h6M12 7V4M10 4h4" \/>/;
   assert.match(panelSource, robotGlyph);
   assert.match(sidebarSource, robotGlyph);
-  assert.match(panelSource, /section === "agents"[\s\S]*?className="settings-section-icon is-agent"/);
-  assert.match(cssSource, /\.settings-section-icon\.is-agent \{[\s\S]*?transform: scale\(1\.25\)/);
+  assert.match(
+    panelSource,
+    /section === "agents"[\s\S]*?className="settings-section-icon is-agent"/,
+  );
+  assert.match(
+    cssSource,
+    /\.settings-section-icon\.is-agent \{[\s\S]*?transform: scale\(1\.25\)/,
+  );
 });
 
 test("uses the compact controls glyph for General", () => {
-  assert.match(panelSource, /section === "general"[\s\S]*?<path d="M20 7h-9M14 17H5" \/>[\s\S]*?<circle cx="7" cy="7" r="3" \/>[\s\S]*?<circle cx="17" cy="17" r="3" \/>/);
+  assert.match(
+    panelSource,
+    /section === "general"[\s\S]*?<path d="M20 7h-9M14 17H5" \/>[\s\S]*?<circle cx="7" cy="7" r="3" \/>[\s\S]*?<circle cx="17" cy="17" r="3" \/>/,
+  );
 });
 
 test("keeps password authentication to one login field and one settings action", () => {
@@ -142,8 +243,17 @@ test("keeps password authentication to one login field and one settings action",
   assert.doesNotMatch(loginSource, /type="(?:text|email)"/);
   assert.match(loginSource, /autoComplete="current-password"/);
   assert.match(loginSource, /!destination\.startsWith\("\/\/"\)/);
-  assert.match(panelSource, /fetch\("\/api\/web-auth", \{ method: "DELETE" \}\)/);
+  assert.match(
+    panelSource,
+    /fetch\("\/api\/web-auth", \{ method: "DELETE" \}\)/,
+  );
   assert.match(panelSource, /t\("auth\.logOut"\)/);
-  assert.match(loginSource, /className="web-login-composer"[\s\S]*?type="password"[\s\S]*?<button type="submit"/);
-  assert.match(globalCssSource, /\.web-login-composer \{[\s\S]*?display: flex;[\s\S]*?border-radius: 14px/);
+  assert.match(
+    loginSource,
+    /className="web-login-composer"[\s\S]*?type="password"[\s\S]*?<button type="submit"/,
+  );
+  assert.match(
+    globalCssSource,
+    /\.web-login-composer \{[\s\S]*?display: flex;[\s\S]*?border-radius: 14px/,
+  );
 });
