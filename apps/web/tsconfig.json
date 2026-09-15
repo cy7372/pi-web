@@ -18,6 +18,9 @@
     "incremental": true,
     "plugins": [
       {
+        "next": true
+      },
+      {
         "name": "next"
       }
     ],
@@ -33,12 +36,12 @@
     "**/*.ts",
     "**/*.tsx",
     ".next/types/**/*.ts",
-    ".next/dev/types/**/*.ts",
-    ".next/dev/dev/types/**/*.ts",
-    ".next-dev/dev/types/**/*.ts",
-    ".next-dev/dev/dev/types/**/*.ts"
+    "../../packages/shared/src/**/*.ts",
+    "../../packages/shared/src/**/*.tsx",
+    ".next/dev/types/**/*.ts"
   ],
   "exclude": [
-    "node_modules"
+    "node_modules",
+    "out"
   ]
 }

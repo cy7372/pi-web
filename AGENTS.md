@@ -1,16 +1,32 @@
 # Pi Web - Development Notes
 
-## Repo layout (2026-09-15, ADR 0005 Phase 0)
+## Repo layout (2026-09-15, ADR 0005 Phase 0+1)
 
-This repo is now a **bun workspaces monorepo**: the Next.js app lives in
-**`apps/api/`** — every path below (`app/`, `lib/`, `components/`, `hooks/`,
-`bin/`, `deploy`-referenced configs) means `apps/api/<path>` since Phase 0.
-Root `package.json` scripts delegate (`bun run dev/build/start` still work
-from the repo root). `apps/web` (static export) and `apps/agent` (daemon)
-are stubs arriving in Phase 1/2; `packages/shared` will hold cross-app
-code. Deploy scripts still live in `deploy/` at the root. Next resolves
-hoisted deps through the `apps/api/node_modules` junction (absolute,
-points at the root store) — recreate it after cloning.
+bun workspaces monorepo, transitioning to **two repos** (user decision
+2026-09-15): pi-web will end as the frontend-only repo; the server side
+(apps/api) moves to a new project **pi-server** via git filter-repo after
+the Phase 1 nginx cutover is verified.
+
+- **packages/shared/src/** — the single source of truth during transition:
+  components/, hooks/, lib/ (all of it), public/, styles/, app-src/ (real
+  layout/page/login/manifest). Both apps resolve `@/*` to it via tsconfig
+  paths. It gets copied into both repos at the split.
+- **apps/api/** — the Next.js app (thin entry files re-export from shared;
+  app/api/** routes; proxy.ts; instrumentation). Production API on :30141.
+- **apps/web/** — static export app (`output: 'export'`, thin entries).
+  `bun run build:web` → apps/web/out → `deploy/deploy-web.cmd` stages to
+  **web-dist/** and swaps atomically (no restart, no SSE interruption).
+- Junctions (recreate after fresh clone): `apps/api/node_modules`,
+  `apps/web/node_modules` → repo root `node_modules`;
+  `apps/api/public`, `apps/web/public` → `packages/shared/src/public`.
+- Fonts are self-hosted (public/fonts + @font-face in styles/app.css) —
+  builds must not need network. theme-init.js is generated from
+  lib/theme.ts (scripts/gen-theme-init.mjs; parity test-enforced).
+- nginx serves web-dist for `/` and proxies `/api/` to :30141
+  (Run/nginx/conf/conf.d/10-pi.cyyu.me.conf).
+
+Deploy: `deploy\deploy.cmd` (API: build + Servy restart) vs
+`deploy\deploy-web.cmd` (web: export + swap, restart-free).
 
 ## Quick Start
 

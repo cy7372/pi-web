@@ -18,6 +18,11 @@ test-results/
 .next/
 .next-dev/
 out/
+web-dist/
+
+# public/ is a junction to packages/shared/src/public (single source; Windows junction, git would duplicate its tree)
+apps/api/public/
+apps/web/public/
 
 # production
 build/

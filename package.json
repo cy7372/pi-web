@@ -17,6 +17,8 @@
     "lint": "bun run --cwd apps/api lint",
     "test": "bun run --cwd apps/api test",
     "test:terminal": "bun run --cwd apps/api test:terminal",
-    "test:e2e": "bun run --cwd apps/api test:e2e"
+    "test:e2e": "bun run --cwd apps/api test:e2e",
+    "build:web": "bun run --cwd apps/web build",
+    "dev:web": "bun run --cwd apps/web dev"
   }
 }
