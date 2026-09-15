@@ -17,9 +17,13 @@ const appDir = resolve(root, "apps/api");
 const nextBin = resolve(root, "node_modules", "next", "dist", "bin", "next");
 
 const env = { ...process.env, PI_WEB_DEV: "1" };
-const result = spawnSync(process.execPath, [nextBin, "dev", ...process.argv.slice(2)], {
-  stdio: "inherit",
-  cwd: appDir,
-  env,
-});
+const result = spawnSync(
+  process.execPath,
+  [nextBin, "dev", ...process.argv.slice(2)],
+  {
+    stdio: "inherit",
+    cwd: appDir,
+    env,
+  },
+);
 process.exit(result.status ?? 1);

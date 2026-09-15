@@ -6,14 +6,27 @@ import { fileURLToPath } from "url";
 const configDir = dirname(fileURLToPath(import.meta.url));
 let version = "0.0.0";
 try {
-  version = (JSON.parse(readFileSync(join(configDir, "package.json"), "utf8")) as { version: string }).version;
-} catch { /* fall back to a placeholder; NEXT_PUBLIC_APP_VERSION is cosmetic */ }
+  version = (
+    JSON.parse(readFileSync(join(configDir, "package.json"), "utf8")) as {
+      version: string;
+    }
+  ).version;
+} catch {
+  /* fall back to a placeholder; NEXT_PUBLIC_APP_VERSION is cosmetic */
+}
 let piVersion = "unknown";
 try {
   // bun workspaces hoist deps to the repo root's node_modules
-  const piPkgPath = join(configDir, "../../node_modules/@earendil-works/pi-coding-agent/package.json");
-  piVersion = (JSON.parse(readFileSync(piPkgPath, "utf8")) as { version: string }).version;
-} catch { /* package not found, use default */ }
+  const piPkgPath = join(
+    configDir,
+    "../../node_modules/@earendil-works/pi-coding-agent/package.json",
+  );
+  piVersion = (
+    JSON.parse(readFileSync(piPkgPath, "utf8")) as { version: string }
+  ).version;
+} catch {
+  /* package not found, use default */
+}
 
 const nextConfig: NextConfig = {
   // monorepo (ADR 0005): deps are hoisted to the workspace root, so tracing
@@ -65,7 +78,10 @@ const nextConfig: NextConfig = {
       {
         source: "/",
         headers: [
-          { key: "Cache-Control", value: "private, no-cache, max-age=0, must-revalidate" },
+          {
+            key: "Cache-Control",
+            value: "private, no-cache, max-age=0, must-revalidate",
+          },
         ],
       },
       {
