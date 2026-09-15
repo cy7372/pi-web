@@ -1,6 +1,8 @@
 # AgentSession host-process isolation: stay in-process behind layered defenses
 
-**Status**: Accepted (2026-09-12) · **Review trigger**: any third incident of
+**Status**: Accepted (2026-09-12); "stay in-process" verdict superseded by
+[ADR 0005](0005-frontend-agent-split.md) (2026-09-15) — defense layers 1–4
+below remain in force. · **Review trigger**: any third incident of
 extension-driven process-state corruption, or an upstream `pi --mode rpc`
 protocol parity milestone.
 
