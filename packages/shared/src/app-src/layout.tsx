@@ -55,7 +55,12 @@ export default function RootLayout({
   children: React.ReactNode;
 }) {
   return (
-    <html lang="en" translate="no" className="notranslate" suppressHydrationWarning>
+    <html
+      lang="en"
+      translate="no"
+      className="notranslate"
+      suppressHydrationWarning
+    >
       <head>
         <meta name="google" content="notranslate" />
         {/* Render-blocking (no defer/async) — must set data-theme before first
