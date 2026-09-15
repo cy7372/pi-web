@@ -195,6 +195,7 @@ ancestry, so merges stay cheapest there), and server-relevant deltas
 (app/api/**, server-side lib changes) are manually ported into pi-server.
 
 Rationale:
+
 - filter-repo rewrites every commit hash, so git-merge against upstream is
   structurally dead in pi-server regardless of anything else.
 - ~85% of upstream churn is frontend (components/hooks) — it belongs to
