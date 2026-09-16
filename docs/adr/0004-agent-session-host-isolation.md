@@ -8,18 +8,18 @@ protocol parity milestone.
 
 ## Background
 
-Pi Web runs `AgentSession` **in-process** inside the production Next.js server
+Dancher Agent web runs `AgentSession` **in-process** inside the production Next.js server
 (`startRpcSession()` → `createAgentSessionFromServices()`), and the SDK loads
 the user's global extensions (`~/.pi/agent/extensions/`) into that same server
 process. Extensions therefore execute in **two hosts**:
 
 - the `pi` TUI (dedicated process; process ≡ session),
-- Pi Web's Next server (shared process: server + every session + Next itself).
+- Dancher Agent web's Next server (shared process: server + every session + Next itself).
 
 Process-global state (`process.chdir`, `process.exit`, `process.env` mutation,
 signal handlers) is harmless in the first host and catastrophic in the second.
 On 2026-09-12 a freshly written `cwd_sync.ts` extension called
-`process.chdir(sessionCwd)` on `session_start`; a Pi Web user opened a session
+`process.chdir(sessionCwd)` on `session_start`; a Dancher Agent web user opened a session
 whose cwd was on `C:` while the server lived on `D:`, and Next 16's per-request
 `path.relative(process.cwd(), projectDir)` returned an absolute cross-drive path
 that `join()` folded into `C:\Users\CyYu\.pi\D:\Programs\pi-web\.next\...`,
@@ -53,7 +53,7 @@ occurrence with a fully closed loop.
 | | Isolation | Verified facts (2026-09-12) | Blocking costs |
 | --- | --- | --- | --- |
 | **B. worker_threads per session** | Platform-level for cwd (Node 22 throws `process.chdir() is not supported in workers` — confirmed empirically); separate heaps | SDK compatibility with workers is **unproven**: `initTheme`, custom-UI registries, and `globalThis.__piSessions` assume a shared main-thread realm that workers deliberately do not share | Message-passing rewrite of `AgentSessionWrapper`; subagent controller and cross-session state all change shape |
-| **C. subprocess `pi --mode rpc`** | Total (process ≡ session, CLI-identical semantics for extensions) | Official JSONL-over-stdio protocol covers prompting, steering, forks, compaction, bash streaming, extension-UI dialogs | Protocol is a **strict subset** of in-process: no `navigate_tree`, no tool-preset switching, no Chat-only mode — Pi Web features would regress until upstream `pi` grows those commands. Per-session spawn cost (Windows `pi`→bun shim→node chain), SSE bridge and lifecycle (idle reap, crash restart) all rewritten |
+| **C. subprocess `pi --mode rpc`** | Total (process ≡ session, CLI-identical semantics for extensions) | Official JSONL-over-stdio protocol covers prompting, steering, forks, compaction, bash streaming, extension-UI dialogs | Protocol is a **strict subset** of in-process: no `navigate_tree`, no tool-preset switching, no Chat-only mode — Dancher Agent web features would regress until upstream `pi` grows those commands. Per-session spawn cost (Windows `pi`→bun shim→node chain), SSE bridge and lifecycle (idle reap, crash restart) all rewritten |
 
 C's latent upside: a session process could run on **another machine** — the
 road toward remote compute (d01/ai2) if session execution is ever offloaded.
@@ -66,7 +66,7 @@ road toward remote compute (d01/ai2) if session execution is ever offloaded.
 - **Negative**: process-global misbehavior outside the `chdir` family (env
   mutation, event-loop blocking, memory leaks) is only partially covered by
   layer 3; a second incident of a *new* family reopens this decision.
-- **Neutral**: layer 3 makes Pi Web's server cwd a defended invariant — any
+- **Neutral**: layer 3 makes Dancher Agent web's server cwd a defended invariant — any
   future subsystem that legitimately wants a different cwd must opt in
   explicitly rather than inherit one from an accident.
 

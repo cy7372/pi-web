@@ -80,3 +80,4 @@ lpt3
 /logs/
 e2e_*.mjs
 
+web-dist.old/

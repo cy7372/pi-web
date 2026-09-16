@@ -50,7 +50,7 @@
 | 文件 | 作用 | 类型 |
 | --- | --- | --- |
 | `conf/conf.d/pub.cyyu.me.conf` | + `/pi/` 全套 location 块(+`/_auth_pi`+`/pi/api/auth/`+`/pi/login.html`+`/pi/_sso`+`@pi_handle_unauth`) | 修改 |
-| `html/pi/login.html` | pi TOTP 登录页(照搬 opencode 模板,改 5 处:标题→Pi Web,POST `/pi/api/auth/login?realm=pi`,return→`/pi/`) | 新增 |
+| `html/pi/login.html` | pi TOTP 登录页(照搬 opencode 模板,改 5 处:标题→Dancher Agent web,POST `/pi/api/auth/login?realm=pi`,return→`/pi/`) | 新增 |
 | `auth/auth_server.py` | REALMS 字典 +`"pi"` realm,共享 `conf/totp.secret` | 修改 |
 | `conf/pi-basic.key` | 后端 Basic Auth 凭证:`proxy_set_header Authorization "Basic ..."`(nginx include) | 新增 |
 

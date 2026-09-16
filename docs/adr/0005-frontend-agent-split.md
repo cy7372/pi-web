@@ -1,4 +1,4 @@
-# Split Pi Web into static frontend, API service, and agent daemon
+# Split Dancher Agent web into static frontend, API service, and agent daemon
 
 **Status**: Accepted (direction, 2026-09-15) · implementation phased — see
 "Migration" · **Supersedes** the "keep AgentSession in-process" decision of
@@ -7,7 +7,7 @@ remain in force; only the in-process verdict is revisited).
 
 ## Context
 
-Pi Web is one Next.js process doing three jobs: serving the SPA, hosting
+Dancher Agent web is one Next.js process doing three jobs: serving the SPA, hosting
 23 API route groups, and running `AgentSession` instances in-process
 (`lib/rpc-manager.ts`, 2.8k lines) — including the user's global pi
 extensions, node-pty terminals, and web-push. Consequences the owner is no

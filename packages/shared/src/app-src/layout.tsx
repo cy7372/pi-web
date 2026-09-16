@@ -8,9 +8,9 @@ import "@/styles/settings.css";
 // there); no next/font/google — builds must not depend on network access.
 
 export const metadata: Metadata = {
-  title: "Pi Web",
-  description: "Pi Web interface for the pi coding agent",
-  applicationName: "Pi Web",
+  title: "Dancher Agent web",
+  description: "Dancher Agent web interface for the pi coding agent",
+  applicationName: "Dancher Agent web",
   manifest: "/manifest.webmanifest",
   icons: {
     icon: [
@@ -31,7 +31,7 @@ export const metadata: Metadata = {
   appleWebApp: {
     capable: true,
     statusBarStyle: "black-translucent",
-    title: "Pi Web",
+    title: "Dancher Agent",
   },
   formatDetection: {
     telephone: false,

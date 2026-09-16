@@ -399,7 +399,7 @@ function PiWebTitle() {
 
   const target = showVersion
     ? `${process.env.NEXT_PUBLIC_APP_VERSION ?? "0.0.0"}p${process.env.NEXT_PUBLIC_PI_VERSION ?? "0.0.0"}`
-    : "Pi Web";
+    : "Dancher Agent";
   const display = useScramble(target, scrambling);
 
   const triggerScramble = useCallback((toVersion: boolean) => {

@@ -1,4 +1,4 @@
-# Pi Web — pi.cyyu.me 前端（静态 SPA）
+# Dancher Agent web — pi.cyyu.me 前端（静态 SPA）
 
 pi coding agent 的 web 前端。**纯静态导出**（`output: 'export'`），nginx 直伺服
 `web-dist/`，零 Node 进程。API 后端在独立仓库 **pi-server**

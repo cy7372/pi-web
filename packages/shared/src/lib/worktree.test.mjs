@@ -24,7 +24,7 @@ test("main and linked worktrees share one canonical project root", async (t) => 
   const repo = path.join(tempRoot, "repo");
   const linked = path.join(tempRoot, "linked");
   await execFileAsync("git", ["init", repo]);
-  await git(repo, ["config", "user.name", "Pi Web Test"]);
+  await git(repo, ["config", "user.name", "Dancher Agent web Test"]);
   await git(repo, ["config", "user.email", "pi-web-test@example.invalid"]);
   await git(repo, ["config", "commit.gpgsign", "false"]);
   await writeFile(path.join(repo, "README.md"), "# test\n");

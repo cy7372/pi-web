@@ -277,7 +277,7 @@ export function createSubagentExtension(
   };
 }
 
-/** Keep Pi Web's integrated implementation when the legacy package is loaded. */
+/** Keep Dancher Agent web's integrated implementation when the legacy package is loaded. */
 export function preferPiWebSubagentExtension(base: LoadExtensionsResult): LoadExtensionsResult {
   const host = base.extensions.find((extension) => extension.path === HOST_SUBAGENT_EXTENSION_PATH);
   if (!host?.tools.has("Agent")) return base;

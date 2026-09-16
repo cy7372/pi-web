@@ -650,7 +650,7 @@ export class AgentSessionWrapper {
               method: "notify",
               notifyType: "warning",
               message:
-                "Extension requested shutdown, but shutdown is not supported in Pi Web.",
+                "Extension requested shutdown, but shutdown is not supported in Dancher Agent web.",
             } as ExtensionUiRequest),
           onError: (error) =>
             this.emit({
@@ -2131,7 +2131,7 @@ export class AgentSessionWrapper {
       getTheme: () => undefined,
       setTheme: () => ({
         success: false,
-        error: "Theme switching is not supported in Pi Web extension UI yet",
+        error: "Theme switching is not supported in Dancher Agent web extension UI yet",
       }),
       getToolsExpanded: () => false,
       setToolsExpanded: () => {},
@@ -2657,7 +2657,7 @@ export async function startRpcSession(
       // Otherwise DO NOT pass a builtin-only allow-list: passing CODING_TOOL_NAMES
       // set allowedToolNames to coding builtins only, which filtered every
       // extension/package-provided tool (e.g. subagents, web access) out of the
-      // tool registry — so they were unavailable in Pi Web sessions even though the
+      // tool registry — so they were unavailable in Dancher Agent web sessions even though the
       // `pi` CLI keeps them. Leaving the allow-list unset lets the SDK register all
       // tools (and activate extension tools); we narrow the ACTIVE set below.
       toolsOption = selectedToolNames.length === 0 ? [] : undefined;
@@ -2784,7 +2784,7 @@ export async function startRpcSession(
 
     // If specific tool names were requested (non-empty), set the active tools to the
     // requested builtin coding tools PLUS all extension/package tools, so installed
-    // extensions stay usable in Pi Web just like in the `pi` CLI.
+    // extensions stay usable in Dancher Agent web just like in the `pi` CLI.
     if (!subagentResources && !chatOnly) {
       inner.setActiveToolsByName(
         withExtensionTools(

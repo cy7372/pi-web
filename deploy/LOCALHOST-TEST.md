@@ -6,7 +6,7 @@
 
 | 验证项 | 结果 |
 |---|---|
-| `/pi` 服务应用 | 200,29KB HTML,`<title>Pi Web</title>` |
+| `/pi` 服务应用 | 200,29KB HTML,`<title>Dancher Agent web</title>` |
 | 静态资源前缀 | 全部 `/pi/_next/...`(Next basePath 自动) |
 | API 路由 | `/pi/api/sessions`→200 JSON,`/pi/api/home`→200 JSON |
 | 根路径拒绝 | `/`→404,`/api/sessions`(无前缀)→404 ✓ |
