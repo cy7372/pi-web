@@ -344,7 +344,10 @@ export function useAgentSession(opts: UseAgentSessionOptions) {
   const [noticeState, dispatchNotice] = useReducer(noticeReducer, { visible: [], pending: [] });
   const [sessionStatsOverride, setSessionStatsOverride] = useState<SessionStatsInfo | null>(null);
   const [extensionDialog, setExtensionDialog] = useState<ExtensionUiDialogRequest | null>(null);
-  const [extensionCustomUi, setExtensionCustomUi] = useState<ExtensionUiCustomRequest | null>(null);
+  // 多槽（2026-09-16，修「同轮多问卷单槽覆盖——多选问卷被后到的问卷顶掉，
+  // 手机端表现为多选变单选」）：服务端 activeCustomUis 可同时挂多个
+  // ui.custom，逐 id upsert/remove；closed 事件只移除对应 id。
+  const [extensionCustomUis, setExtensionCustomUis] = useState<ExtensionUiCustomRequest[]>([]);
   const [extensionStatuses, setExtensionStatuses] = useState<ExtensionStatusItem[]>([]);
   const [extensionWidgets, setExtensionWidgets] = useState<ExtensionWidgetItem[]>([]);
   const [queuedMessages, setQueuedMessages] = useState<QueuedMessages>({ steering: [], followUp: [] });
@@ -896,9 +899,11 @@ export function useAgentSession(opts: UseAgentSessionOptions) {
         opts.chatInputRef?.current?.insertText(request.text);
         break;
       case "custom":
-        setExtensionCustomUi((current) => {
-          if (request.closed) return current?.id === request.id ? null : current;
-          return request;
+        setExtensionCustomUis((current) => {
+          if (request.closed) return current.filter((item) => item.id !== request.id);
+          const next = current.filter((item) => item.id !== request.id);
+          next.push(request as ExtensionUiCustomRequest);
+          return next;
         });
         break;
     }
@@ -1389,6 +1394,7 @@ export function useAgentSession(opts: UseAgentSessionOptions) {
         break;
       case "extension_ui_closed":
         setExtensionDialog((current) => current?.id === event.id ? null : current);
+        setExtensionCustomUis((current) => current.filter((item) => item.id !== event.id));
         break;
     }
   }, [addNotice, cancelEventStreamGrace, handleExtensionUiRequest, loadSession, notifyPromptStage, onAgentEnd, scheduleEventStreamClose, scrollToBottom, settleUiStage, syncLiveModel]);
@@ -2218,7 +2224,7 @@ export function useAgentSession(opts: UseAgentSessionOptions) {
     isCompacting, compactError, compactResult, currentModel, displayModel, modelSwitching, sessionStats,
     autoCompactionEnabled, truncationBanner,
     slashCommands, slashCommandsLoading, queuedMessages,
-    notices: noticeState.visible, extensionDialog, extensionCustomUi, extensionStatuses, extensionWidgets, respondToExtensionUi, sendExtensionCustomInput,
+    notices: noticeState.visible, extensionDialog, extensionCustomUis, extensionStatuses, extensionWidgets, respondToExtensionUi, sendExtensionCustomInput,
     isAutoModelSelection: isNew && newSessionModel === null,
     agentPhase,
     isNew,

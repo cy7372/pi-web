@@ -281,7 +281,7 @@ export function ChatWindow({ session, searchTarget, onSearchTargetHandled, initi
     truncationBanner,
     setTruncationBanner,
     slashCommands, slashCommandsLoading, queuedMessages,
-    notices, extensionDialog, extensionCustomUi, extensionStatuses, extensionWidgets, respondToExtensionUi, sendExtensionCustomInput, setNoticePaused,
+    notices, extensionDialog, extensionCustomUis, extensionStatuses, extensionWidgets, respondToExtensionUi, sendExtensionCustomInput, setNoticePaused,
     isAutoModelSelection,
     agentPhase,
     isNew,
@@ -981,9 +981,9 @@ export function ChatWindow({ session, searchTarget, onSearchTargetHandled, initi
         {extensionDialog && (
           <ExtensionDialog key={extensionDialog.id} request={extensionDialog} onRespond={respondToExtensionUi} />
         )}
-        {extensionCustomUi && (
-          <ExtensionCustomPanel key={extensionCustomUi.id} request={extensionCustomUi} onInput={sendExtensionCustomInput} />
-        )}
+        {extensionCustomUis.map((panel) => (
+          <ExtensionCustomPanel key={panel.id} request={panel} onInput={sendExtensionCustomInput} />
+        ))}
         {!isEmptyNew && <>
 {truncationBanner && (
               <div
