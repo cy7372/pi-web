@@ -8,6 +8,7 @@ import { acquireSessionLivenessLease } from "./session-liveness";
 export interface AgentEventStreamSession {
   readonly isStreaming: boolean;
   readonly streamingMessage: unknown;
+  isAlive?(): boolean;
   onEvent(listener: (event: AgentEventLike) => void): () => void;
 }
 
@@ -34,7 +35,6 @@ type StreamCloser = (closeController: boolean | "error") => void;
 const activeStreamClosers: Set<StreamCloser> = ((
   globalThis as Record<symbol, Set<StreamCloser>>
 )[CLOSER_REGISTRY] ??= new Set<StreamCloser>());
-
 /** Close every live SSE stream (called on process shutdown signals). */
 export function closeAllAgentEventStreams(): void {
   for (const close of [...activeStreamClosers]) {
@@ -65,7 +65,6 @@ export function registerAgentEventStreamCloser(
 export function activeAgentEventStreamCount(): number {
   return activeStreamClosers.size;
 }
-
 function errorMessage(error: unknown): string {
   return error instanceof Error ? error.message : String(error);
 }
@@ -102,6 +101,7 @@ export function createAgentEventStream(
         activeStreamClosers.delete(cleanup);
         releaseLease();
         releaseLease = () => {};
+        activeStreamClosers.delete(cleanup);
         if (heartbeat !== null) clearInterval(heartbeat);
         unsubscribe?.();
         unsubscribe = null;
@@ -117,12 +117,12 @@ export function createAgentEventStream(
             controller.close();
           } catch {
             /* stream already closed */
-          }
-        }
+          }        }
       };
       cancelStream = cleanup;
       activeStreamClosers.add(cleanup);
       releaseLease = acquireSessionLivenessLease(sessionId).release;
+      activeStreamClosers.add(cleanup);
 
       const enqueueText = (text: string) => {
         if (closed) return;
@@ -145,10 +145,18 @@ export function createAgentEventStream(
         try {
           const session = await sessionPromise;
           if (closed) return;
+          if (session.isAlive && !session.isAlive()) {
+            cleanup(true);
+            return;
+          }
 
           const bufferedEvents: AgentEventLike[] = [];
           let snapshotPublished = false;
           const handleEvent = (event: AgentEventLike) => {
+            if (event.type === "session_shutdown") {
+              cleanup(true);
+              return;
+            }
             if (!snapshotPublished) {
               bufferedEvents.push(event);
               return;
@@ -159,6 +167,11 @@ export function createAgentEventStream(
           const stopListening = session.onEvent(handleEvent);
           if (closed) {
             stopListening();
+            return;
+          }
+          if (session.isAlive && !session.isAlive()) {
+            stopListening();
+            cleanup(true);
             return;
           }
           unsubscribe = stopListening;

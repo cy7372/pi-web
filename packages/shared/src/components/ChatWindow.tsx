@@ -1,11 +1,12 @@
 "use client";
 import { registerAbortHandler } from "@/hooks/useKeyboardShortcuts";
+import Image from "next/image";
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { createPortal } from "react-dom";
 import type { AgentMessage, AssistantContentBlock, AssistantMessage, BashExecutionMessage, BlockingExtensionUiRequest, ExtensionUiRequest, SessionInfo, SessionTreeNode, ToolResultMessage, UserMessage } from "@/lib/types";
 import { normalizeCustomPanelLinesMapped } from "@/lib/ansi";
 import { asBracketedPaste, toTerminalKeyData } from "@/lib/terminal-input";
-import { countToolCallBlocks, getAssistantErrorMessage, getDisplayableAssistantBlocks, isMessageGroupAnchor, splitFinalAssistantBlocks } from "@/lib/message-display";
+import { countToolCallBlocks, getAssistantErrorMessage, getDisplayableAssistantBlocks, isAssistantTruncated, isMessageGroupAnchor, splitFinalAssistantBlocks } from "@/lib/message-display";
 import { extractTurnWrittenFiles, type WrittenFile } from "@/lib/turn-written-files";
 import { buildQuotedSelection } from "@/lib/quoted-selection";
 import { MessageView } from "./MessageView";
@@ -54,7 +55,7 @@ interface Props {
   onSessionStatsChange?: (stats: SessionStatsInfo | null) => void;
   onSessionStatsPanelOpen?: () => void;
   onContextUsageChange?: (usage: { percent: number | null; contextWindow: number; tokens: number | null } | null) => void;
-  onOpenFile?: (filePath: string) => void;
+  onOpenFile?: (filePath: string, page?: number) => void;
   onOpenSession?: (sessionId: string) => void;
   onAskInNewChat?: (prompt: string, sourceSessionId: string, sourceEntryId: string) => Promise<void>;
   quoteSelectionEnabled?: boolean;
@@ -283,8 +284,10 @@ export function ChatWindow({ session, searchTarget, onSearchTargetHandled, initi
     slashCommands, slashCommandsLoading, queuedMessages,
     notices, extensionDialog, extensionCustomUis, extensionStatuses, extensionWidgets, respondToExtensionUi, sendExtensionCustomInput, setNoticePaused,
     isAutoModelSelection,
+    isAutoThinkingSelection,
     agentPhase,
     isNew,
+    showScrollToBottom,
     sessionIdRef, scrollContainerRef,
     lastUserMsgRef, promptAnchorActive,
     handleSend, handleAbort, handleFork, handleNavigate, handleModelChange,
@@ -884,6 +887,7 @@ export function ChatWindow({ session, searchTarget, onSearchTargetHandled, initi
       toolPreset={toolPreset}
       onToolPresetChange={session || isNew ? handleToolPresetChange : undefined}
       thinkingLevel={thinkingLevel}
+      isAutoThinkingSelection={isAutoThinkingSelection}
       onThinkingLevelChange={session || isNew ? handleThinkingLevelChange : undefined}
       availableThinkingLevels={availableThinkingLevels}
       thinkingLevelMap={currentThinkingLevelMap}
@@ -1159,7 +1163,7 @@ export function ChatWindow({ session, searchTarget, onSearchTargetHandled, initi
 
                 const finalAssistant = messages[finalAssistantIdx] as AssistantMessage;
                 const finalSplit = splitFinalAssistantBlocks(finalAssistant);
-                const finalAnswerMessage = finalSplit.answerBlocks.length > 0 || getAssistantErrorMessage(finalAssistant)
+                const finalAnswerMessage = finalSplit.answerBlocks.length > 0 || getAssistantErrorMessage(finalAssistant) || isAssistantTruncated(finalAssistant)
                   ? withAssistantBlocks(finalAssistant, finalSplit.answerBlocks)
                   : null;
 
@@ -1305,7 +1309,7 @@ export function ChatWindow({ session, searchTarget, onSearchTargetHandled, initi
             position: "fixed",
             top: quotedSelection.top,
             left: quotedSelection.left,
-            zIndex: 130,
+            zIndex: 260,
             display: "flex",
             flexWrap: "wrap",
             gap: 3,
@@ -1376,6 +1380,33 @@ export function ChatWindow({ session, searchTarget, onSearchTargetHandled, initi
       )}
 
       <div className="relative shrink-0">
+        {!isEmptyNew && (
+          <div
+            style={{
+              position: "absolute",
+              bottom: "100%",
+              left: 0,
+              right: isMobile ? 0 : CHAT_MINIMAP_WIDTH,
+              display: "flex",
+              justifyContent: "center",
+              paddingBottom: 10,
+              pointerEvents: "none",
+              zIndex: 20,
+            }}
+          >
+            <button
+              type="button"
+              className={`chat-scroll-to-bottom${showScrollToBottom && !pendingScrollRestore ? " is-visible" : ""}`}
+              title={t("chat.scrollToLatest")}
+              aria-label={t("chat.scrollToLatest")}
+              onClick={() => scrollToBottom("smooth")}
+            >
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                <path d="M12 5v14M5 12l7 7 7-7" />
+              </svg>
+            </button>
+          </div>
+        )}
         {isEmptyNew && (
           <div className="mx-auto mb-3 w-full" style={{ maxWidth: "var(--chat-content-max-width, 820px)", paddingLeft: 32, paddingRight: isMobile ? 32 : 68 }}>
             <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, fontFamily: "var(--font-mono)" }}>
@@ -1774,6 +1805,8 @@ function ExtensionDialog({
                   color: "var(--text)",
                   fontSize: 14,
                   fontWeight: 650,
+                  lineHeight: 1.45,
+                  whiteSpace: "pre-wrap",
                   overflowWrap: "anywhere",
                 }}
               >
@@ -1788,6 +1821,10 @@ function ExtensionDialog({
                     whiteSpace: "pre-wrap",
                     marginTop: 4,
                     overflowWrap: "anywhere",
+                    // Match the scroller's padding so keyboard navigation never parks the
+                    // option flush against the edge, where whole-pixel scroll snapping and
+                    // overflow clipping cut off its focus ring.
+                    scrollMargin: 14,
                   }}
                 >
                   {dialogParts.prose}

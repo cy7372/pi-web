@@ -11,6 +11,15 @@ const cssSource = await readFile(
   "utf8",
 );
 
+test("composer attachments open in the shared preview with a separate remove button", async () => {
+  const inputSource = await readFile(new URL("./ChatInput.tsx", import.meta.url), "utf8");
+  assert.match(inputSource, /import \{ ImagePreview \} from "\.\/ImagePreview"/);
+  assert.match(
+    inputSource,
+    /<ImagePreview key=\{img\.previewUrl\} src=\{img\.previewUrl\}>[\s\S]*?<img[\s\S]*?src=\{img\.previewUrl\}[\s\S]*?<\/ImagePreview>\s*<button\s*type="button"\s*onClick=\{\(\) => removeImage\(i\)\}/,
+  );
+});
+
 test("uses a native modal dialog and restores focus to its trigger", () => {
   assert.match(source, /useRef<HTMLDialogElement>\(null\)/);
   assert.match(source, /dialog\.showModal\(\)/);

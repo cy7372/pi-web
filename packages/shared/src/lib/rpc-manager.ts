@@ -28,6 +28,7 @@ import {
   getLatestModelChange,
   getSessionListVersion,
   invalidateSessionListCache,
+  readLatestSessionEntryId,
   resolveSessionPath,
 } from "./session-reader";
 import {
@@ -460,6 +461,21 @@ export class AgentSessionWrapper {
         this.inner.isBashRunning ||
         this.parkedPrompts.length > 0)
     );
+  }
+
+  /**
+   * Drop this idle wrapper when the on-disk JSONL has an entry the in-memory
+   * index never saw (another pi process appended). Rechecks isRunning() so a
+   * prompt that started during the probe cannot be disposed.
+   */
+  evictIfDiskAhead(): boolean {
+    if (!this.isAlive() || this.isRunning()) return false;
+    const diskLatestId = readLatestSessionEntryId(this.sessionFile);
+    if (!diskLatestId || this.inner.sessionManager.getEntry(diskLatestId)) return false;
+    if (this.isRunning()) return false;
+    this.destroy();
+    invalidateSessionListCache();
+    return true;
   }
 
   isChatOnly(): boolean {
@@ -1428,6 +1444,9 @@ export class AgentSessionWrapper {
   destroy(): void {
     if (!this._alive) return;
     this._alive = false;
+    // Tell attached SSE listeners to drop this instance so the browser
+    // EventSource errors and reconnects instead of staying OPEN on a dead wrapper.
+    this.emit({ type: "session_shutdown" });
     if (this.idleTimer) clearTimeout(this.idleTimer);
     if (this.inner.isBashRunning) this.inner.abortBash();
     this.unsubscribe?.();
