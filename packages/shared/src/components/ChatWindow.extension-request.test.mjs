@@ -44,14 +44,23 @@ test("renders extension confirmation and options as markdown", () => {
 });
 
 test("preserves title newlines like pi's TUI and keeps long titles from hiding the body", () => {
+  // Local fork: the dialog renders splitDialogTitle's structured parts
+  // (heading/prose) instead of the raw title; newline semantics live on the
+  // heading div (pre-wrap + overflowWrap) and the header is capped at 50%
+  // with its own scroll so long titles cannot push the body out.
   const header = dialogSource.slice(dialogSource.indexOf('role="dialog"'), dialogSource.indexOf("{request.method === \"confirm\""));
-  assert.match(header, /whiteSpace: "pre-wrap", overflowWrap: "anywhere" \}\}>\{request\.title\}/);
-  assert.match(header, /maxHeight: "50%", overflowY: "auto" \}\}>[\s\S]*?\{request\.title\}/);
+  assert.match(header, /maxHeight: "50%",[\s\S]*?overflowY: "auto"/);
+  const hIdx = header.indexOf("{dialogParts.heading}");
+  assert.notEqual(hIdx, -1, "heading element not found");
+  const headingStyle = header.slice(Math.max(0, hIdx - 600), hIdx);
+  assert.match(headingStyle, /whiteSpace: "pre-wrap"/);
+  assert.match(headingStyle, /overflowWrap: "anywhere"/);
 });
 
 test("resets collapse state when a new extension request arrives", () => {
   assert.match(source, /<ExtensionDialog key=\{extensionDialog.id\}/);
-  assert.match(source, /<ExtensionCustomPanel key=\{extensionCustomUi.id\}/);
+  // Local fork (multi-slot custom UIs): panels map over extensionCustomUis, keyed by panel.id.
+  assert.match(source, /<ExtensionCustomPanel key=\{panel.id\} request=\{panel\}/);
   assert.match(
     customSource,
     /if \(!collapsed\) inputRef.current\?\.focus\(\);\s*}, \[collapsed\]\)/,

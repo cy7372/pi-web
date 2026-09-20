@@ -1797,6 +1797,11 @@ function ExtensionDialog({
               gap: 8,
               padding: "12px 14px",
               borderBottom: "1px solid var(--border)",
+              // Long multi-line titles must not push the body out of the
+              // dialog: cap the header at half the dialog and scroll it
+              // (upstream fcd94bf semantics, ported to dialogParts layout).
+              maxHeight: "50%",
+              overflowY: "auto",
             }}
           >
             <div style={{ flex: 1, minWidth: 0 }}>
